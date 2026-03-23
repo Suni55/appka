@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+
+<html lang="pl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WMS – Przyjęcie Palet</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f1117;color:#e8e4d8;font-family:'Courier New','Lucida Console',monospace;min-height:100vh}
+  select option{background:#0f1117;color:#e8e4d8}
+  @keyframes sl{0%{top:8%}50%{top:88%}100%{top:8%}}
+  @keyframes fade{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#1a1d26}::-webkit-scrollbar-thumb{background:#2d3142}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const STORAGE_KEY = “wms-pallets”;
+const EAN_DB_KEY  = “wms-ean-db”;
+const LOCATIONS   = [“A1”,“A2”,“A3”,“A4”,“B1”,“B2”,“B3”,“B4”,“C1”,“C2”,“C3”,“C4”,“D1”,“D2”,“D3”,“D4”];
+const CATEGORIES  = [“Elektronika”,“Żywność”,“Chemia”,“Odzież”,“Meble”,“AGD/RTV”,“Materiały budowlane”,“Inne”];
+
+const store = {
+get: k  => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+set: (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+const fmt = iso => {
+const d = new Date(iso);
+return d.toLocaleDateString(“pl-PL”,{day:“2-digit”,month:“2-digit”,year:“numeric”})
++ “ “ + d.toLocaleTimeString(“pl-PL”,{hour:“2-digit”,minute:“2-digit”});
+};
+const uid = () => “PAL-” + Date.now().toString(36).toUpperCase();
+
+const INP = {
+background:”#0f1117”, border:“1px solid #2d3142”, color:”#e8e4d8”,
+padding:“10px 12px”, fontFamily:”‘Courier New’,monospace”, fontSize:13,
+width:“100%”, outline:“none”,
+};
+const LBL = { display:“block”, fontSize:10, letterSpacing:2, color:”#888”, marginBottom:6, textTransform:“uppercase” };
+
+// ─── jsQR camera scanner ────────────────────────────────────────────────────
+function EanScanner({ onDetected, onClose }) {
+const videoRef  = useRef(null);
+const canvasRef = useRef(null);
+const rafRef    = useRef(null);
+const streamRef = useRef(null);
+const [status, setStatus] = useState(“Uruchamianie kamery…”);
+const [err,    setErr]    = useState(null);
+
+useEffect(() => {
+let active = true;
+
+```
+async function start() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setErr("Twoja przeglądarka nie obsługuje dostępu do kamery.\nSpróbuj Chrome lub Safari i upewnij się, że strona działa przez HTTPS.");
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
+    });
+  } catch(e) {
+    setErr("Brak dostępu do kamery.\nSprawdź uprawnienia w ustawieniach przeglądarki i odśwież stronę.\n(" + e.message + ")");
+    return;
+  }
+  if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
+  streamRef.current = stream;
+  const video = videoRef.current;
+  video.srcObject = stream;
+  video.setAttribute("playsinline", true);
+  await video.play();
+  setStatus("Skieruj kamerę na kod kreskowy lub QR…");
+
+  function tick() {
+    if (!active) return;
+    const canvas = canvasRef.current;
+    const ctx    = canvas.getContext("2d");
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+      if (code) {
+        active = false;
+        onDetected(code.data);
+        return;
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }
+  rafRef.current = requestAnimationFrame(tick);
+}
+
+start();
+return () => {
+  active = false;
+  cancelAnimationFrame(rafRef.current);
+  streamRef.current?.getTracks().forEach(t => t.stop());
+};
+```
+
+}, []);
+
+return (
+<div style={{ position:“fixed”, inset:0, background:“rgba(0,0,0,0.95)”, zIndex:1000,
+display:“flex”, flexDirection:“column”, alignItems:“center”,
+justifyContent:“center”, gap:16, padding:20 }}>
+<div style={{ color:”#f5c518”, fontWeight:700, letterSpacing:3, fontSize:12 }}>SKANUJ KOD</div>
+
+```
+  {err ? (
+    <div style={{ color:"#f44336", fontSize:12, textAlign:"center", maxWidth:320,
+                  lineHeight:1.7, whiteSpace:"pre-line", border:"1px solid #f4433655",
+                  padding:16, background:"#1a0a0a", borderRadius:2 }}>{err}</div>
+  ) : (
+    <div style={{ position:"relative", width:"min(300px,90vw)", aspectRatio:"4/3",
+                  background:"#000", overflow:"hidden" }}>
+      <video ref={videoRef} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
+             muted playsInline/>
+      <canvas ref={canvasRef} style={{ display:"none" }}/>
+      {/* corner brackets */}
+      {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
+        <div key={v+h} style={{ position:"absolute", [v]:-1, [h]:-1, width:24, height:24,
+          borderTop:    v==="top"    ? "3px solid #f5c518" : "none",
+          borderBottom: v==="bottom" ? "3px solid #f5c518" : "none",
+          borderLeft:   h==="left"   ? "3px solid #f5c518" : "none",
+          borderRight:  h==="right"  ? "3px solid #f5c518" : "none" }}/>
+      ))}
+      {/* scanline */}
+      <div style={{ position:"absolute", left:0, right:0, height:2, pointerEvents:"none",
+                    background:"linear-gradient(90deg,transparent,#f5c518,transparent)",
+                    animation:"sl 2s linear infinite" }}/>
+    </div>
+  )}
+
+  <div style={{ color:"#888", fontSize:11, letterSpacing:1, textAlign:"center", maxWidth:280 }}>
+    {!err && status}
+  </div>
+  <div style={{ color:"#666", fontSize:10, letterSpacing:1, textAlign:"center", maxWidth:280 }}>
+    {!err && "Obsługuje kody EAN-13, EAN-8, Code-128, QR i inne"}
+  </div>
+
+  <button onClick={onClose} style={{ background:"transparent", border:"2px solid #f5c518",
+    color:"#f5c518", fontFamily:"'Courier New',monospace", fontWeight:700,
+    fontSize:11, letterSpacing:2, padding:"9px 32px", cursor:"pointer", marginTop:4 }}>
+    ANULUJ
+  </button>
+</div>
+```
+
+);
+}
+
+// ─── Main App ────────────────────────────────────────────────────────────────
+function App() {
+const [pallets,   setPallets]   = useState(() => store.get(STORAGE_KEY) || []);
+const [eanDb,     setEanDb]     = useState(() => store.get(EAN_DB_KEY)  || {});
+const [view,      setView]      = useState(“add”);
+const [form,      setForm]      = useState({ ean:””, product:””, category:CATEGORIES[0], quantity:””, unit:“szt.”, location:LOCATIONS[0], notes:”” });
+const [search,    setSearch]    = useState(””);
+const [flash,     setFlash]     = useState(null);
+const [showScan,  setShowScan]  = useState(false);
+const [eanForm,   setEanForm]   = useState({ ean:””, product:””, category:CATEGORIES[0] });
+const [eanSearch, setEanSearch] = useState(””);
+
+const flash$ = (type, msg) => { setFlash({type,msg}); setTimeout(() => setFlash(null), 3000); };
+
+const savePallets = d => store.set(STORAGE_KEY, d);
+const saveEanDb   = d => store.set(EAN_DB_KEY,  d);
+
+function fillFromEan(code, db) {
+const e = (db || eanDb)[code];
+if (e) { setForm(f => ({…f, ean:code, product:e.product, category:e.category})); flash$(“success”, `Rozpoznano: ${e.product}`); }
+else   { setForm(f => ({…f, ean:code})); flash$(“warn”, `Nieznany kod: ${code} — uzupełnij ręcznie`); }
+}
+
+function handleEanInput(e) {
+const code = e.target.value;
+setForm(f => ({…f, ean:code}));
+if (eanDb[code]) { const en = eanDb[code]; setForm(f => ({…f, ean:code, product:en.product, category:en.category})); }
+}
+
+function handleAdd() {
+if (!form.product.trim()) { flash$(“error”,“Podaj nazwę produktu!”); return; }
+const p = {
+id: uid(), ean: form.ean.trim(), product: form.product.trim(),
+category: form.category, quantity: form.quantity ? `${form.quantity} ${form.unit}` : “—”,
+location: form.location, notes: form.notes.trim(), createdAt: new Date().toISOString(),
+};
+let db = eanDb;
+if (p.ean && !eanDb[p.ean]) {
+db = {…eanDb, [p.ean]: {product: p.product, category: p.category}};
+setEanDb(db); saveEanDb(db);
+}
+const updated = [p, …pallets];
+setPallets(updated); savePallets(updated);
+setForm({ean:””, product:””, category:CATEGORIES[0], quantity:””, unit:“szt.”, location:LOCATIONS[0], notes:””});
+flash$(“success”, `Paleta ${p.id} przyjęta!`);
+}
+
+function delPallet(id) { const u = pallets.filter(p => p.id !== id); setPallets(u); savePallets(u); }
+
+function handleAddEan() {
+if (!eanForm.ean.trim() || !eanForm.product.trim()) { flash$(“error”,“Podaj kod EAN i nazwę!”); return; }
+const u = {…eanDb, [eanForm.ean.trim()]: {product: eanForm.product.trim(), category: eanForm.category}};
+setEanDb(u); saveEanDb(u);
+setEanForm({ean:””, product:””, category:CATEGORIES[0]});
+flash$(“success”, `Dodano: ${eanForm.ean.trim()}`);
+}
+function delEan(code) { const u = {…eanDb}; delete u[code]; setEanDb(u); saveEanDb(u); }
+
+const filtered = pallets.filter(p => [p.product,p.location,p.id,p.category,p.ean].some(v => v?.toLowerCase().includes(search.toLowerCase())));
+const locCnt={}, catCnt={};
+pallets.forEach(p => { locCnt[p.location]=(locCnt[p.location]||0)+1; catCnt[p.category]=(catCnt[p.category]||0)+1; });
+const topLoc   = Object.entries(locCnt).sort((a,b) => b[1]-a[1]).slice(0,5);
+const topCat   = Object.entries(catCnt).sort((a,b) => b[1]-a[1]);
+const today    = new Date().toDateString();
+const todayCnt = pallets.filter(p => new Date(p.createdAt).toDateString() === today).length;
+const eanList  = Object.entries(eanDb).filter(([c,v]) => !eanSearch || c.includes(eanSearch) || v.product.toLowerCase().includes(eanSearch.toLowerCase()));
+
+const NAV = [[“add”,“＋ PRZYJMIJ”],[“list”,`☰ LISTA (${pallets.length})`],[“stats”,“◈ STATYSTYKI”],[“ean”,`⬡ BAZA EAN (${Object.keys(eanDb).length})`]];
+
+const YBtn = ({onClick,children,style={}}) => (
+<button onClick={onClick} style={{ background:”#f5c518”,color:”#0f1117”,border:“none”,
+fontFamily:”‘Courier New’,monospace”,fontWeight:900,fontSize:12,letterSpacing:1,cursor:“pointer”,…style }}>
+{children}
+</button>
+);
+
+return (
+<div>
+{showScan && <EanScanner onDetected={c => { setShowScan(false); fillFromEan(c, eanDb); }} onClose={() => setShowScan(false)}/>}
+
+```
+  {/* Header */}
+  <header style={{ background:"#1a1d26",borderBottom:"3px solid #f5c518",padding:"14px 20px",
+                   display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
+    <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+      <div style={{ background:"#f5c518",color:"#0f1117",fontWeight:900,fontSize:20,padding:"4px 10px",letterSpacing:1 }}>WMS</div>
+      <div>
+        <div style={{ fontWeight:700,fontSize:14,letterSpacing:2,textTransform:"uppercase" }}>Przyjęcie Palet</div>
+        <div style={{ fontSize:10,color:"#888",letterSpacing:1 }}>Magazyn / Warehouse System</div>
+      </div>
+    </div>
+    <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
+      {NAV.map(([v,l]) => (
+        <button key={v} onClick={() => setView(v)} style={{
+          background:view===v?"#f5c518":"transparent", color:view===v?"#0f1117":"#f5c518",
+          border:"2px solid #f5c518",padding:"5px 11px",fontFamily:"inherit",
+          fontWeight:700,fontSize:10,letterSpacing:1,cursor:"pointer" }}>{l}</button>
+      ))}
+    </div>
+  </header>
+
+  {/* Flash */}
+  {flash && (
+    <div style={{ animation:"fade .2s ease",
+      background:flash.type==="success"?"#1a3a1a":flash.type==="warn"?"#2a2a0a":"#3a1a1a",
+      border:`2px solid ${flash.type==="success"?"#4caf50":flash.type==="warn"?"#f5c518":"#f44336"}`,
+      color:flash.type==="success"?"#4caf50":flash.type==="warn"?"#f5c518":"#f44336",
+      padding:"9px 20px",fontWeight:700,fontSize:12,letterSpacing:1,textAlign:"center" }}>
+      {flash.msg}
+    </div>
+  )}
+
+  <main style={{ maxWidth:900,margin:"0 auto",padding:"24px 18px" }}>
+
+    {/* ── ADD ── */}
+    {view==="add" && (
+      <div>
+        <div style={{ color:"#f5c518",fontSize:11,letterSpacing:3,marginBottom:18,textTransform:"uppercase" }}>▶ Nowa paleta</div>
+        <div style={{ background:"#1a1d26",border:"1px solid #2d3142",padding:"24px",
+                      display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+          {/* EAN row */}
+          <div style={{ gridColumn:"1 / -1" }}>
+            <label style={LBL}>Kod EAN / Kod kreskowy</label>
+            <div style={{ display:"flex",gap:8 }}>
+              <input value={form.ean} onChange={handleEanInput}
+                placeholder="Wpisz lub zeskanuj kod"
+                style={{...INP,flex:1}} autoComplete="off"/>
+              <YBtn onClick={() => setShowScan(true)} style={{ padding:"0 18px",flexShrink:0,fontSize:13 }}>
+                📷 SKANUJ
+              </YBtn>
+            </div>
+            {form.ean && eanDb[form.ean] && (
+              <div style={{ marginTop:5,fontSize:11,color:"#4caf50",letterSpacing:1 }}>
+                ✓ Znaleziono: <strong>{eanDb[form.ean].product}</strong>
+              </div>
+            )}
+            {form.ean && !eanDb[form.ean] && (
+              <div style={{ marginTop:5,fontSize:11,color:"#888",letterSpacing:1 }}>
+                Nieznany kod — uzupełnij ręcznie (zostanie dodany do bazy)
+              </div>
+            )}
+          </div>
+
+          <div style={{ gridColumn:"1 / -1" }}>
+            <label style={LBL}>Nazwa produktu *</label>
+            <input value={form.product} onChange={e => setForm(f => ({...f,product:e.target.value}))}
+              placeholder='np. Telewizory LED 55"' style={INP} autoComplete="off"/>
+          </div>
+
+          <div>
+            <label style={LBL}>Kategoria</label>
+            <select value={form.category} onChange={e => setForm(f => ({...f,category:e.target.value}))} style={INP}>
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={LBL}>Ilość</label>
+            <div style={{ display:"flex",gap:8 }}>
+              <input value={form.quantity} type="number" min="0"
+                onChange={e => setForm(f => ({...f,quantity:e.target.value}))}
+                placeholder="np. 48" style={{...INP,flex:2}}/>
+              <select value={form.unit} onChange={e => setForm(f => ({...f,unit:e.target.value}))} style={{...INP,flex:1}}>
+                {["szt.","kg","l","m²","opak."].map(u => <option key={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={LBL}>Lokalizacja</label>
+            <select value={form.location} onChange={e => setForm(f => ({...f,location:e.target.value}))} style={INP}>
+              {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={LBL}>Uwagi</label>
+            <input value={form.notes} onChange={e => setForm(f => ({...f,notes:e.target.value}))}
+              placeholder="opcjonalne" style={INP}/>
+          </div>
+
+          <div style={{ gridColumn:"1 / -1",marginTop:4 }}>
+            <YBtn onClick={handleAdd} style={{ padding:"13px 32px",width:"100%",fontSize:13,letterSpacing:2 }}>
+              ✓ PRZYJMIJ PALETĘ
+            </YBtn>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── LIST ── */}
+    {view==="list" && (
+      <div>
+        <div style={{ color:"#f5c518",fontSize:11,letterSpacing:3,marginBottom:18,textTransform:"uppercase" }}>▶ Przyjęte palety</div>
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Szukaj po ID, EAN, produkcie, lokalizacji…" style={{...INP,marginBottom:14}}/>
+        {filtered.length===0
+          ? <div style={{ color:"#555",textAlign:"center",padding:"40px 0",fontSize:12,letterSpacing:1 }}>
+              {pallets.length===0 ? "Brak przyjętych palet." : "Brak wyników."}
+            </div>
+          : <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+              {filtered.map(p => (
+                <div key={p.id} style={{ background:"#1a1d26",border:"1px solid #2d3142",padding:"12px 16px",
+                                         display:"grid",gridTemplateColumns:"auto 1fr auto auto",gap:"0 14px",alignItems:"center" }}>
+                  <div style={{ background:"#f5c518",color:"#0f1117",fontWeight:900,fontSize:10,
+                                padding:"3px 7px",letterSpacing:1,whiteSpace:"nowrap" }}>{p.id}</div>
+                  <div>
+                    <div style={{ fontWeight:700,fontSize:13 }}>{p.product}</div>
+                    <div style={{ fontSize:11,color:"#888",marginTop:2 }}>
+                      {p.ean && <span style={{ color:"#a8c4ff" }}>{p.ean} · </span>}
+                      {p.category} · {p.quantity}{p.notes && ` · ${p.notes}`} · {fmt(p.createdAt)}
+                    </div>
+                  </div>
+                  <div style={{ background:"#252836",border:"1px solid #3d4259",color:"#a8c4ff",
+                                fontWeight:700,fontSize:15,padding:"5px 10px",textAlign:"center",letterSpacing:1,minWidth:36 }}>{p.location}</div>
+                  <button onClick={() => delPallet(p.id)} style={{ background:"transparent",border:"1px solid #3a2020",
+                    color:"#884444",fontFamily:"inherit",fontSize:13,padding:"5px 9px",cursor:"pointer" }}>✕</button>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+    )}
+
+    {/* ── STATS ── */}
+    {view==="stats" && (
+      <div>
+        <div style={{ color:"#f5c518",fontSize:11,letterSpacing:3,marginBottom:18,textTransform:"uppercase" }}>▶ Statystyki</div>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24 }}>
+          {[["WSZYSTKICH PALET",pallets.length,"#f5c518"],["PRZYJĘTO DZIŚ",todayCnt,"#4caf50"],["KODY W BAZIE",Object.keys(eanDb).length,"#a8c4ff"]].map(([l,v,c]) => (
+            <div key={l} style={{ background:"#1a1d26",border:`1px solid ${c}44`,padding:"18px 14px",textAlign:"center" }}>
+              <div style={{ fontSize:34,fontWeight:900,color:c }}>{v}</div>
+              <div style={{ fontSize:10,color:"#888",letterSpacing:2,marginTop:4 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:18 }}>
+          {[["TOP LOKALIZACJE",topLoc,"#a8c4ff"],["KATEGORIE",topCat,"#f5c518"]].map(([title,rows,col]) => (
+            <div key={title} style={{ background:"#1a1d26",border:"1px solid #2d3142",padding:"18px" }}>
+              <div style={{ color:col,fontSize:11,letterSpacing:2,marginBottom:12 }}>{title}</div>
+              {rows.length===0 ? <div style={{ color:"#555",fontSize:12 }}>Brak danych</div>
+                : rows.map(([name,cnt]) => (
+                  <div key={name} style={{ display:"flex",alignItems:"center",gap:8,marginBottom:7 }}>
+                    <div style={{ color:col,fontWeight:700,minWidth:36,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{name}</div>
+                    <div style={{ flex:1,background:"#252836",height:10,position:"relative",overflow:"hidden" }}>
+                      <div style={{ position:"absolute",left:0,top:0,bottom:0,width:`${cnt/(rows[0]?.[1]||1)*100}%`,background:col }}/>
+                    </div>
+                    <div style={{ color:"#888",fontSize:11,minWidth:16 }}>{cnt}</div>
+                  </div>
+                ))
+              }
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* ── EAN DB ── */}
+    {view==="ean" && (
+      <div>
+        <div style={{ color:"#f5c518",fontSize:11,letterSpacing:3,marginBottom:18,textTransform:"uppercase" }}>▶ Baza kodów EAN</div>
+        <div style={{ background:"#1a1d26",border:"1px solid #2d3142",padding:"18px",marginBottom:18,
+                      display:"grid",gridTemplateColumns:"1fr 2fr 1fr auto",gap:10,alignItems:"end" }}>
+          <div>
+            <label style={LBL}>Kod EAN</label>
+            <input value={eanForm.ean} onChange={e => setEanForm(f => ({...f,ean:e.target.value}))}
+              placeholder="5901234123457" style={INP}/>
+          </div>
+          <div>
+            <label style={LBL}>Nazwa produktu</label>
+            <input value={eanForm.product} onChange={e => setEanForm(f => ({...f,product:e.target.value}))}
+              placeholder="np. Kawa Jacobs 500g" style={INP}/>
+          </div>
+          <div>
+            <label style={LBL}>Kategoria</label>
+            <select value={eanForm.category} onChange={e => setEanForm(f => ({...f,category:e.target.value}))} style={INP}>
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <YBtn onClick={handleAddEan} style={{ padding:"10px 16px",whiteSpace:"nowrap" }}>＋ DODAJ</YBtn>
+        </div>
+
+        <input value={eanSearch} onChange={e => setEanSearch(e.target.value)}
+          placeholder="Szukaj kodu lub produktu…" style={{...INP,marginBottom:12}}/>
+
+        {eanList.length===0
+          ? <div style={{ color:"#555",textAlign:"center",padding:"32px 0",fontSize:12,letterSpacing:1 }}>
+              {Object.keys(eanDb).length===0 ? "Baza jest pusta. Dodaj pierwsze kody EAN." : "Brak wyników."}
+            </div>
+          : <div style={{ display:"flex",flexDirection:"column",gap:7 }}>
+              {eanList.map(([code,v]) => (
+                <div key={code} style={{ background:"#1a1d26",border:"1px solid #2d3142",padding:"10px 16px",
+                                         display:"grid",gridTemplateColumns:"auto 1fr auto auto",gap:"0 14px",alignItems:"center" }}>
+                  <div style={{ color:"#a8c4ff",fontFamily:"monospace",fontSize:13,letterSpacing:1,fontWeight:700 }}>{code}</div>
+                  <div>
+                    <div style={{ fontSize:13,fontWeight:700 }}>{v.product}</div>
+                    <div style={{ fontSize:11,color:"#888" }}>{v.category}</div>
+                  </div>
+                  <div style={{ fontSize:11,color:"#555" }}>{pallets.filter(p => p.ean===code).length}× przyjęto</div>
+                  <button onClick={() => delEan(code)} style={{ background:"transparent",border:"1px solid #3a2020",
+                    color:"#884444",fontFamily:"inherit",fontSize:13,padding:"4px 8px",cursor:"pointer" }}>✕</button>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+    )}
+
+  </main>
+</div>
+```
+
+);
+}
+
+ReactDOM.createRoot(document.getElementById(“root”)).render(<App/>);
+</script>
+
+</body>
+</html>
