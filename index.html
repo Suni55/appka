@@ -1796,7 +1796,79 @@
         showToast(oldName ? '✅ Przepis zaktualizowany!' : '✅ Przepis dodany!');
     }
 
-    // ─── EDYTOR PRZEPISÓW ───────────────────────────────────────
+    function editorDelete() {
+        const name = editorRecipe;
+        if (!name) return;
+        if (!confirm(`Usunąć przepis "${name}"?`)) return;
+
+        // Usuń z runtime
+        delete PRZEPISY_DATA.skladniki[name];
+        delete PRZEPISY_DATA.instrukcje[name];
+        delete NUTRITION_DATA[name];
+        PRZEPISY_DATA.przepisy = PRZEPISY_DATA.przepisy.filter(p => p !== name);
+        const obiadIdx = OBIADY_LIST.indexOf(name);
+        if (obiadIdx !== -1) OBIADY_LIST.splice(obiadIdx, 1);
+
+        // Zapisz do listy usuniętych (persistent)
+        const deleted = loadDeletedRecipes();
+        if (!deleted.includes(name)) deleted.push(name);
+        saveDeletedRecipes(deleted);
+
+        // Usuń też z custom jeśli był tam
+        const customs = loadCustomRecipes().filter(r => r.name !== name);
+        saveCustomRecipes(customs);
+
+        // Usuń z planu jeśli był użyty
+        let planChanged = false;
+        Object.keys(currentPlan).forEach(k => {
+            if (currentPlan[k] === name) { delete currentPlan[k]; planChanged = true; }
+        });
+        if (planChanged) savePlan(currentPlan);
+
+        closeEditor();
+        renderRecipes();
+        showToast('🗑️ Przepis usunięty');
+    }
+
+    const DELETED_RECIPES_KEY = 'deletedRecipes';
+    function loadDeletedRecipes() {
+        try { return JSON.parse(localStorage.getItem(DELETED_RECIPES_KEY) || '[]'); } catch(e) { return []; }
+    }
+    function saveDeletedRecipes(arr) {
+        localStorage.setItem(DELETED_RECIPES_KEY, JSON.stringify(arr));
+    }
+
+    function restoreCustomRecipes() {
+        // 1. Usuń przepisy oznaczone jako skasowane
+        const deleted = loadDeletedRecipes();
+        deleted.forEach(name => {
+            delete PRZEPISY_DATA.skladniki[name];
+            delete PRZEPISY_DATA.instrukcje[name];
+            delete NUTRITION_DATA[name];
+            PRZEPISY_DATA.przepisy = PRZEPISY_DATA.przepisy.filter(p => p !== name);
+            const idx = OBIADY_LIST.indexOf(name);
+            if (idx !== -1) OBIADY_LIST.splice(idx, 1);
+        });
+
+        // 2. Dodaj/nadpisz przepisami własnymi
+        const customs = loadCustomRecipes();
+        customs.forEach(d => {
+            if (!d.name) return;
+            if (!PRZEPISY_DATA.przepisy.includes(d.name)) PRZEPISY_DATA.przepisy.push(d.name);
+            PRZEPISY_DATA.skladniki[d.name] = d.skladniki || [];
+            PRZEPISY_DATA.instrukcje[d.name] = (d.kroki || []).map((k,i) => `${i+1}. ${k}`);
+            NUTRITION_DATA[d.name] = { kcal: d.kcal||0, b: d.b||0, w: d.w||0, t: d.t||0 };
+            if (d.isObiad && !OBIADY_LIST.includes(d.name)) OBIADY_LIST.push(d.name);
+            else if (!d.isObiad) {
+                const idx = OBIADY_LIST.indexOf(d.name);
+                if (idx !== -1) OBIADY_LIST.splice(idx, 1);
+            }
+        });
+
+        if (customs.length || deleted.length) {
+            PRZEPISY_DATA.przepisy.sort((a,b) => a.localeCompare(b,'pl'));
+        }
+    }
 
     // ─── STATYSTYKI HISTORII ────────────────────────────────────
     let statsRange = '30'; // '7' | '30' | 'all'
