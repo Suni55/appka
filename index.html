@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FF6B35">
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Plan Posiłków">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="icons/icon-114.png">
+    <link rel="apple-touch-icon" sizes="76x76"   href="icons/icon-76.png">
+    <link rel="apple-touch-icon" sizes="72x72"   href="icons/icon-72.png">
+    <link rel="apple-touch-icon" sizes="60x60"   href="icons/icon-60.png">
+    <link rel="apple-touch-icon" sizes="57x57"   href="icons/icon-57.png">
+
+    <!-- iOS splash screen color -->
+    <meta name="msapplication-TileColor" content="#FF6B35">
+    <meta name="msapplication-TileImage" content="icons/icon-144.png">
+
+    <title>Plan Posiłków</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <h1>🍽️ Plan Posiłków</h1>
+            <button class="dark-toggle" onclick="toggleDarkMode()" id="dark-btn" title="Ciemny motyw">🌙</button>
+        </div>
+        <p>Planuj posiłki i twórz listę zakupów</p>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('today')">📅 Dzisiaj</div>
+        <div class="tab" onclick="switchTab('plan')">🗓️ Plan</div>
+        <div class="tab" onclick="switchTab('shopping')">🛒 Zakupy</div>
+        <div class="tab" onclick="switchTab('recipes')">📖 Przepisy</div>
+        <div class="tab" onclick="switchTab('settings')">⚙️ Ustawienia</div>
+    </div>
+
+    <div class="content">
+        <!-- DZISIAJ -->
+        <div id="tab-today" class="tab-content active">
+            <div id="today-container"></div>
+            <div id="macro-panel-container"></div>
+            <div id="suggestions-container"></div>
+        </div>
+
+        <!-- PLAN -->
+        <div id="tab-plan" class="tab-content">
+            <!-- Pasek tygodnia -->
+            <div style="background:var(--bg-card);padding:12px 16px 10px;margin-bottom:14px;border-radius:16px;box-shadow:var(--shadow);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div id="cal-week-label" style="font-family:'Bricolage Grotesque',sans-serif;font-size:15px;font-weight:700;color:var(--text-secondary);"></div>
+                    <div style="display:flex;gap:4px;">
+                        <button class="cal-strip-btn" onclick="calPrevWeek()">‹</button>
+                        <button class="cal-strip-btn" style="font-size:13px;padding:4px 8px;" onclick="calGoToday()">Dziś</button>
+                        <button class="cal-strip-btn" onclick="calNextWeek()">›</button>
+                    </div>
+                </div>
+                <div class="cal-strip" id="cal-strip"></div>
+            </div>
+            <!-- Panel dnia -->
+            <div id="plan-container"></div>
+            <!-- Statystyki -->
+            <div id="stats-container"></div>
+        </div>
+
+        <!-- ZAKUPY -->
+        <div id="tab-shopping" class="tab-content">
+            <!-- Zakres dat -->
+            <div class="card" style="margin-bottom:14px;">
+                <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:15px;font-weight:700;color:var(--primary);margin-bottom:12px;">🗓️ Zakres zakupów</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;">Od</div>
+                        <input type="date" id="shop-date-from" class="notif-time-picker" style="width:100%;" onchange="updateShoppingList()">
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;">Do</div>
+                        <input type="date" id="shop-date-to" class="notif-time-picker" style="width:100%;" onchange="updateShoppingList()">
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" style="flex:1;padding:10px;" onclick="setShopRange(7)">7 dni</button>
+                    <button class="btn btn-secondary" style="flex:1;padding:10px;" onclick="setShopRange(14)">14 dni</button>
+                    <button class="btn btn-purple" style="flex:1;padding:10px;" onclick="setShopRange(30)">Miesiąc</button>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-items">0</div>
+                    <div class="stat-label">Produktów</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="checked-items">0</div>
+                    <div class="stat-label">Kupionych</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-bottom:14px;" onclick="clearCheckedItems()">✓ Wyczyść kupione</button>
+            <div class="custom-add-form">
+                <div class="custom-add-title">➕ Dodaj własny produkt</div>
+                <div class="custom-add-row">
+                    <input type="text" class="custom-add-input" id="custom-product-input"
+                        placeholder="Np. Ketchup, Pieczywo..."
+                        onkeydown="if(event.key==='Enter') addCustomProduct()">
+                    <button class="custom-add-btn" onclick="addCustomProduct()">+</button>
+                </div>
+            </div>
+            <div class="card" id="shopping-list"></div>
+        </div>
+
+        <!-- PRZEPISY -->
+        <div id="tab-recipes" class="tab-content">
+            <div class="card" style="margin-bottom: 14px;">
+                <div style="font-weight: 700; font-size: 14px; margin-bottom: 12px; color: var(--text-primary);">🔍 Filtruj i sortuj</div>
+                
+                <!-- Wyszukiwarka + przycisk ulubionych -->
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <input type="text" id="recipe-search" class="recipe-input" placeholder="Szukaj przepisu..." 
+                        oninput="filterRecipes()" style="flex:1;">
+                    <button id="fav-filter-btn" class="fav-filter-btn" onclick="toggleFavFilter()">❤️ Ulubione</button>
+                </div>
+                
+                <!-- Filtry -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <select id="filter-calories" class="filter-select" onchange="filterRecipes()">
+                        <option value="all">Wszystkie kalorie</option>
+                        <option value="low">< 500 kcal</option>
+                        <option value="medium">500-700 kcal</option>
+                        <option value="high">> 700 kcal</option>
+                    </select>
+                    
+                    <select id="filter-type" class="filter-select" onchange="filterRecipes()">
+                        <option value="all">Wszystkie typy</option>
+                        <option value="breakfast">Śniadania/Kolacje</option>
+                        <option value="lunch">Obiady</option>
+                    </select>
+                </div>
+                
+                <!-- Sortowanie -->
+                <select id="sort-recipes" class="filter-select" onchange="filterRecipes()">
+                    <option value="alpha">Sortuj: A-Z</option>
+                    <option value="calories-asc">Sortuj: Kalorie ↑</option>
+                    <option value="calories-desc">Sortuj: Kalorie ↓</option>
+                    <option value="protein-asc">Sortuj: Białko ↑</option>
+                    <option value="protein-desc">Sortuj: Białko ↓</option>
+                </select>
+            </div>
+            
+            <div id="recipes-list"></div>
+            <button onclick="openEditorNew()" style="width:100%;margin-top:10px;padding:14px;border:2px dashed var(--border);border-radius:14px;background:none;color:var(--text-secondary);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;"
+                onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
+                onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
+                ✨ Dodaj własny przepis
+            </button>
+        </div>
+
+        <!-- USTAWIENIA -->
+        <div id="tab-settings" class="tab-content">
+        <div class="settings-section">
+            <div class="settings-title">🔔 Powiadomienia</div>
+            <div class="settings-row">
+                <div>
+                    <div class="settings-row-label">Przypomnienie o śniadaniu</div>
+                    <div class="settings-row-desc">Powiadomienie rano z dzisiejszym menu</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="notif-toggle" onchange="toggleNotifications(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-row" id="notif-time-row" style="display:none;">
+                <div>
+                    <div class="settings-row-label">Godzina powiadomienia</div>
+                    <div class="settings-row-desc">O której chcesz dostać przypomnienie?</div>
+                </div>
+                <input type="time" class="notif-time-picker" id="notif-time" value="07:30" onchange="saveNotifTime(this.value)">
+            </div>
+            <div id="notif-status"></div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-title">🎨 Wygląd</div>
+            <div class="settings-row">
+                <div>
+                    <div class="settings-row-label">Ciemny motyw</div>
+                    <div class="settings-row-desc">Zmień wygląd aplikacji</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="dark-toggle-settings" onchange="toggleDarkMode()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="settings-section" id="sync-section">
+            <div class="settings-title">☁️ Synchronizacja</div>
+            <div id="sync-ui"><!-- wypełniane przez JS --></div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-title">📱 O aplikacji</div>
+            <div class="settings-row">
+                <div>
+                    <div class="settings-row-label">Wersja</div>
+                    <div class="settings-row-desc">Plan Posiłków PWA</div>
+                </div>
+                <span style="font-weight:700;color:var(--text-secondary);">1.0</span>
+            </div>
+        </div>
+    </div>
+    </div><!-- koniec div.content -->
+
+    <!-- TRYB GOTOWANIA -->
+    <div id="cooking-overlay" class="cooking-overlay"></div>
+
+    <!-- COPY DAY MODAL -->
+    <div id="copyday-overlay" class="sync-overlay" onclick="closeCopyDayModal()">
+        <div class="sync-box" id="copyday-box" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <!-- EDYTOR PRZEPISÓW -->
+    <div id="editor-overlay" class="editor-overlay" onclick="closeEditor()">
+        <div class="editor-box" onclick="event.stopPropagation()">
+            <div class="editor-header">
+                <div class="editor-title" id="editor-title">Nowy przepis</div>
+                <button class="editor-close" onclick="closeEditor()">✕</button>
+            </div>
+            <div class="editor-body" id="editor-body"><!-- wypełniane przez JS --></div>
+            <div class="editor-footer" id="editor-footer"><!-- wypełniane przez JS --></div>
+        </div>
+    </div>
+
+    <script src="przepisy.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/today.js"></script>
+    <script src="js/plan.js"></script>
+    <script src="js/shopping.js"></script>
+    <script src="js/recipes.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/app.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW zarejestrowany:', reg.scope))
+                    .catch(err => console.log('SW błąd:', err));
+            });
+        }
+    </script>
+</body>
+</html>
