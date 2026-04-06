@@ -115,4 +115,14 @@
         if (localStorage.getItem(NOTIF_KEY) === 'true' && Notification.permission === 'granted') {
             scheduleNotifications();
         }
+        // Nasłuchuj prośby o reschedule od service workera (po 24h)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data && event.data.type === 'RESCHEDULE_NOTIF') {
+                    if (localStorage.getItem(NOTIF_KEY) === 'true' && Notification.permission === 'granted') {
+                        scheduleNotifications();
+                    }
+                }
+            });
+        }
     }

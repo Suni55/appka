@@ -51,9 +51,9 @@
                 const nutrition = NUTRITION_DATA[p];
                 if (nutrition) {
                     const kcal = nutrition.kcal;
-                    if (caloriesFilter === 'low' && kcal >= 500) return false;
-                    if (caloriesFilter === 'medium' && (kcal < 500 || kcal > 700)) return false;
-                    if (caloriesFilter === 'high' && kcal <= 700) return false;
+                    if (caloriesFilter === 'low'    && kcal >= KCAL_LOW)  return false;
+                    if (caloriesFilter === 'medium' && (kcal < KCAL_LOW || kcal > KCAL_HIGH)) return false;
+                    if (caloriesFilter === 'high'   && kcal <= KCAL_HIGH) return false;
                 }
             }
             
@@ -125,38 +125,73 @@
     }
 
     // ─── TRYB GOTOWANIA ────────────────────────────────────────
+    let _cookingName = '';
+    let _cookingServings = 1;
+
     function startCooking(name) {
-        const ings  = PRZEPISY_DATA.skladniki[name]||[];
-        const steps = PRZEPISY_DATA.instrukcje[name]||[];
-        const ov = document.getElementById('cooking-overlay');
+        _cookingName = name;
+        _cookingServings = 1;
+        _renderCooking();
+        document.getElementById('cooking-overlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function _renderCooking() {
+        const name     = _cookingName;
+        const servings = _cookingServings;
+        const ings     = PRZEPISY_DATA.skladniki[name] || [];
+        const steps    = PRZEPISY_DATA.instrukcje[name] || [];
+        const ov       = document.getElementById('cooking-overlay');
+
+        const servingsHTML = `
+            <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.12);
+                        border-radius:12px;padding:8px 14px;margin:8px 16px 0;">
+                <span style="font-size:13px;opacity:.9;">🍽️ Porcje:</span>
+                <button onclick="changeCookingServings(-1)"
+                    style="width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.25);
+                           color:#fff;font-size:18px;cursor:pointer;line-height:1;">−</button>
+                <span id="cooking-servings-val" style="font-size:18px;font-weight:700;min-width:24px;text-align:center;">${servings}</span>
+                <button onclick="changeCookingServings(1)"
+                    style="width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.25);
+                           color:#fff;font-size:18px;cursor:pointer;line-height:1;">+</button>
+            </div>`;
+
         ov.innerHTML = `
             <div class="cooking-top">
                 <button class="cooking-close" onclick="closeCooking()">×</button>
-                <div class="cooking-top-title">${name}</div>
+                <div class="cooking-top-title">${sanitize(name)}</div>
                 <div style="opacity:.85;font-size:13px;margin-top:4px;">Tryb gotowania</div>
+                ${servingsHTML}
             </div>
             <div class="cooking-body">
                 <div class="cooking-section">
-                    <div class="cooking-section-title">📝 Składniki</div>
-                    ${ings.map(i=>`<div class="cooking-ing"><span>${i.skladnik}</span><strong>${i.ilosc} ${i.jednostka}</strong></div>`).join('')}
+                    <div class="cooking-section-title">📝 Składniki${servings > 1 ? ` <span style="font-size:12px;opacity:.7;">(×${servings})</span>` : ''}</div>
+                    ${ings.map(i => {
+                        const scaled = Math.round(i.ilosc * servings * 10) / 10;
+                        return `<div class="cooking-ing"><span>${sanitize(i.skladnik)}</span><strong>${scaled} ${sanitize(i.jednostka)}</strong></div>`;
+                    }).join('')}
                 </div>
                 <div class="cooking-section">
                     <div class="cooking-section-title">👨‍🍳 Przygotowanie</div>
-                    ${steps.map((s,i) => {
-                        const clean = s.replace(/^\d+\.\s*/,'');
-                        const tm = clean.match(/(\d+)\s*(minut|min|godzin|godz)/i);
+                    ${steps.map((s, i) => {
+                        const clean = s.replace(/^\d+\.\s*/, '');
+                        const tm    = clean.match(/(\d+)\s*(minut|min|godzin|godz)/i);
                         return `<div class="cooking-step-card">
-                            <div class="cooking-step-num">${i+1}</div>
-                            <div class="cooking-step-text">${clean}</div>
-                            ${tm ? `<div class="cooking-timer-badge">⏱️ ${tm[0]}</div>` : ''}
+                            <div class="cooking-step-num">${i + 1}</div>
+                            <div class="cooking-step-text">${sanitize(clean)}</div>
+                            ${tm ? `<div class="cooking-timer-badge">⏱️ ${sanitize(tm[0])}</div>` : ''}
                         </div>`;
                     }).join('')}
                 </div>
             </div>`;
-        ov.classList.add('active');
-        document.body.style.overflow='hidden';
     }
+
+    function changeCookingServings(delta) {
+        _cookingServings = Math.max(1, Math.min(10, _cookingServings + delta));
+        _renderCooking();
+    }
+
     function closeCooking() {
         document.getElementById('cooking-overlay').classList.remove('active');
-        document.body.style.overflow='';
+        document.body.style.overflow = '';
     }

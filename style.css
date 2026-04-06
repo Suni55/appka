@@ -31,6 +31,12 @@
         body.dark .recipe-body { background: #252525; }
         body.dark .ingredient-item { border-bottom-color: #3A3A3A; }
         body.dark .instruction-step { background: #2E2E2E; }
+        body.dark .cooking-section { background: #252525; }
+        body.dark .cooking-ing { border-bottom-color: #3A3A3A; color: var(--text-primary); }
+        body.dark .cooking-step-card { background: #2E2E2E; }
+        body.dark .cooking-timer-badge { background: var(--secondary); }
+        body.dark .custom-add-form { background: #252525; }
+        body.dark .custom-add-input { background: #2E2E2E; color: var(--text-primary); border-color: #3A3A3A; }
         body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; background: var(--bg-main); color: var(--text-primary); line-height: 1.6; padding-bottom: 80px; overflow-x: hidden; transition: background 0.3s, color 0.3s; }
 
         /* HEADER */

@@ -68,7 +68,10 @@
         return Object.values(ing);
     }
 
-    function updateShoppingList() {
+    // Debounced wrapper — odświeża listę maksymalnie raz na DEBOUNCE_DELAY ms
+    const updateShoppingList = debounce(_updateShoppingList, DEBOUNCE_DELAY);
+
+    function _updateShoppingList() {
         const el = document.getElementById('shopping-list');
         if (!el) return;
         const items = calcShoppingList();
@@ -110,12 +113,12 @@
             html += `<div class="shopping-item ${isChecked?'checked':''}">
                 <div class="checkbox ${isChecked?'checked':''}" onclick="toggleItem('${key}')"></div>
                 <div class="item-info">
-                    <div class="item-name">${item.name}</div>
-                    <div class="item-details">Potrzebne: ${neededDisplay}</div>
+                    <div class="item-name">${sanitize(item.name)}</div>
+                    <div class="item-details">Potrzebne: ${sanitize(neededDisplay)}</div>
                 </div>
                 <input type="number" class="item-input" value="${owned||''}" placeholder="0"
                     onchange="updateOwned('${key}',this.value)" onclick="event.stopPropagation()">
-                <div class="item-needed">${toBuyDisplay}</div>
+                <div class="item-needed">${sanitize(toBuyDisplay)}</div>
             </div>`;
         });
 
@@ -133,7 +136,7 @@
                 html += `<div class="shopping-item ${p.checked ? 'checked' : ''}">
                     <div class="checkbox ${p.checked ? 'checked' : ''}" onclick="toggleCustomProduct(${p.id})"></div>
                     <div class="item-info" style="grid-column: span 2;">
-                        <div class="item-name">${p.name}</div>
+                        <div class="item-name">${sanitize(p.name)}</div>
                     </div>
                     <button class="custom-item-delete" onclick="deleteCustomProduct(${p.id})" title="Usuń">✕</button>
                 </div>`;

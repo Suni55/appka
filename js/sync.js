@@ -11,6 +11,41 @@
     let isSyncing       = false;
     let sbClient        = null; // Supabase JS client
 
+    // ── Offline queue — przechowuje operacje gdy brak połączenia ──
+    let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
+    function saveSyncQueue() { localStorage.setItem('syncQueue', JSON.stringify(syncQueue)); }
+
+    // ── Retry helper — ponawia żądanie z wykładniczym backoff ────
+    async function sbFetchWithRetry(path, opts = {}, attempts = SYNC_RETRY_ATTEMPTS) {
+        for (let i = 0; i < attempts; i++) {
+            try {
+                return await sbFetch(path, opts);
+            } catch (err) {
+                if (i === attempts - 1) throw err;
+                await new Promise(r => setTimeout(r, SYNC_RETRY_DELAY * Math.pow(2, i)));
+            }
+        }
+    }
+
+    // ── Opróżnij kolejkę offline ─────────────────────────────────
+    async function drainSyncQueue() {
+        if (!syncPairId || !syncQueue.length) return;
+        const todo = [...syncQueue];
+        syncQueue = [];
+        saveSyncQueue();
+        for (const op of todo) {
+            try {
+                if (op.type === 'plan')    await pushPlanEntry(op.dayKey, op.mealId, op.person, op.recipe);
+                if (op.type === 'checked') await pushCheckedItem(op.itemKey, op.checked);
+            } catch (e) {
+                syncQueue.push(op); // z powrotem do kolejki
+                saveSyncQueue();
+                console.warn('[Sync] Nie udało się opróżnić kolejki:', e);
+                break; // nie próbuj reszty jeśli sieć nie działa
+            }
+        }
+    }
+
     // ── Init klienta Supabase JS SDK ─────────────────────────────
     function initSupabaseClient() {
         if (typeof supabase === 'undefined') return null;
@@ -86,7 +121,7 @@
         if (!syncPairId || isSyncing) return;
         try {
             if (recipe) {
-                await sbFetch('meal_plan', {
+                await sbFetchWithRetry('meal_plan', {
                     method: 'POST',
                     headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
                     body: JSON.stringify({
@@ -96,14 +131,18 @@
                     })
                 });
             } else {
-                await sbFetch('meal_plan?pair_id=eq.' + syncPairId +
+                await sbFetchWithRetry('meal_plan?pair_id=eq.' + syncPairId +
                     '&day_key=eq.' + encodeURIComponent(dayKey) +
                     '&meal_id=eq.' + encodeURIComponent(mealId) +
                     '&person=eq.' + encodeURIComponent(person), {
                     method: 'DELETE', headers: { 'Prefer': '' }
                 });
             }
-        } catch(e) { console.error('pushPlan:', e); }
+        } catch(e) {
+            console.warn('[Sync] pushPlan failed, dodaję do kolejki offline:', e);
+            syncQueue.push({ type:'plan', dayKey, mealId, person, recipe });
+            saveSyncQueue();
+        }
     }
 
     // ── Push: zakupy ─────────────────────────────────────────────
@@ -113,7 +152,7 @@
         const safeKey = btoa(unescape(encodeURIComponent(itemKey)));
         try {
             if (checked) {
-                await sbFetch('shopping_checked', {
+                await sbFetchWithRetry('shopping_checked', {
                     method: 'POST',
                     headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
                     body: JSON.stringify({
@@ -122,12 +161,16 @@
                     })
                 });
             } else {
-                await sbFetch('shopping_checked?pair_id=eq.' + syncPairId +
+                await sbFetchWithRetry('shopping_checked?pair_id=eq.' + syncPairId +
                     '&item_key=eq.' + encodeURIComponent(safeKey), {
                     method: 'DELETE', headers: { 'Prefer': '' }
                 });
             }
-        } catch(e) { console.error('pushChecked:', e); }
+        } catch(e) {
+            console.warn('[Sync] pushChecked failed, dodaję do kolejki offline:', e);
+            syncQueue.push({ type:'checked', itemKey, checked });
+            saveSyncQueue();
+        }
     }
 
     // ── Realtime przez Supabase JS SDK ───────────────────────────
@@ -201,8 +244,10 @@
         try {
             await pullAll();
             subscribeRealtime();
+            // Wyślij operacje z kolejki offline po odzyskaniu połączenia
+            await drainSyncQueue();
         } catch(e) {
-            console.error('initSync error:', e);
+            console.error('[Sync] initSync error:', e);
             setSyncStatus('error');
         }
         renderSyncUI();

@@ -1,4 +1,33 @@
-const DAYS = [
+// ─── STAŁE KONFIGURACYJNE ──────────────────────────────────
+    const APP_VERSION = '2.0';
+    const KCAL_LOW     = 500;   // Próg "nisko-kaloryczne" (kcal)
+    const KCAL_HIGH    = 700;   // Próg "wysoko-kaloryczne" (kcal)
+    const DEBOUNCE_DELAY      = 150;  // ms — opóźnienie dla listy zakupów
+    const SYNC_RETRY_ATTEMPTS = 3;    // ile razy ponawiamy nieudany push
+    const SYNC_RETRY_DELAY    = 800;  // ms — bazowe opóźnienie retry (podwaja się)
+
+    // ─── BEZPIECZEŃSTWO: sanitizacja HTML ─────────────────────
+    function sanitize(str) {
+        if (typeof DOMPurify !== 'undefined') return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+        // Fallback — escape podstawowych znaków HTML
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // ─── DEBOUNCE ──────────────────────────────────────────────
+    function debounce(fn, delay) {
+        let timer;
+        return function(...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
+    const DAYS = [
         {id:'mon',name:'Poniedziałek'},{id:'tue',name:'Wtorek'},{id:'wed',name:'Środa'},
         {id:'thu',name:'Czwartek'},{id:'fri',name:'Piątek'},{id:'sat',name:'Sobota'},{id:'sun',name:'Niedziela'}
     ];

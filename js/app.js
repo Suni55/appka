@@ -4,14 +4,19 @@
         localStorage.removeItem('syncCode');
         localStorage.removeItem('syncRole');
     }
-    
-    initDarkMode();
-    initNotifications();
-    updateRecipeHistory(currentPlan);
-    restoreCustomRecipes();
-    renderToday();
-    renderCalendar();
-    // Ustaw domyślny zakres zakupów po załadowaniu DOM
-    setTimeout(initShopDates, 100);
-    // Uruchom synchronizację jeśli para już skonfigurowana
-    setTimeout(initSync, 300);
+
+    try {
+        initDarkMode();
+        initNotifications();
+        updateRecipeHistory(currentPlan);
+        restoreCustomRecipes();
+        renderToday();
+        renderCalendar();
+        initShopDates();   // DOM jest gotowy — skrypty ładowane po </body>
+    } catch (err) {
+        console.error('[App] Błąd podczas inicjalizacji UI:', err);
+    }
+
+    // initSync jest async — uruchamiamy po inicjalizacji UI
+    // Supabase SDK jest ładowane synchronicznie przed app.js, więc jest dostępne
+    initSync().catch(err => console.error('[App] Błąd synchronizacji przy starcie:', err));
