@@ -93,6 +93,9 @@
             sbFetch('shopping_checked?pair_id=eq.' + syncPairId + '&select=item_key,checked')
         ]);
 
+        // Pull household members (non-blocking)
+        pullHouseholdMembers().catch(e => console.warn('[Sync] household pull failed:', e));
+
         isSyncing = true;
         // Plan
         const remotePlan = {};
@@ -142,6 +145,45 @@
             console.warn('[Sync] pushPlan failed, dodaję do kolejki offline:', e);
             syncQueue.push({ type:'plan', dayKey, mealId, person, recipe });
             saveSyncQueue();
+        }
+    }
+
+    // ── Push: household member ─────────────────────────────────────
+    async function pushHouseholdMember(member) {
+        if (!syncPairId) return;
+        try {
+            await sbFetchWithRetry('household_members', {
+                method: 'POST',
+                headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+                body: JSON.stringify({
+                    pair_id: syncPairId,
+                    member_id: member.id,
+                    name: member.name,
+                    emoji: member.emoji || '',
+                    kcal_limit: member.kcalLimit || 2000,
+                    updated_at: new Date().toISOString()
+                })
+            });
+        } catch(e) {
+            console.warn('[Sync] pushHouseholdMember failed:', e);
+        }
+    }
+
+    async function pullHouseholdMembers() {
+        if (!syncPairId) return;
+        try {
+            const rows = await sbFetch('household_members?pair_id=eq.' + syncPairId + '&select=member_id,name,emoji,kcal_limit');
+            if (rows && rows.length > 0) {
+                const household = rows.map(r => ({
+                    id: r.member_id,
+                    name: r.name,
+                    emoji: r.emoji || '',
+                    kcalLimit: r.kcal_limit || 2000
+                }));
+                saveHousehold(household);
+            }
+        } catch(e) {
+            console.warn('[Sync] pullHouseholdMembers failed:', e);
         }
     }
 
@@ -195,6 +237,13 @@
                 localStorage.setItem('mealPlan', JSON.stringify(currentPlan));
                 isSyncing = false;
                 renderAll();
+            })
+            .on('postgres_changes', {
+                event: '*', schema: 'public', table: 'household_members',
+                filter: 'pair_id=eq.' + syncPairId
+            }, (payload) => {
+                // Odśwież household z serwera
+                pullHouseholdMembers().then(() => renderAll()).catch(() => {});
             })
             .on('postgres_changes', {
                 event: '*', schema: 'public', table: 'shopping_checked',
@@ -264,6 +313,10 @@
             localStorage.setItem(PAIR_KEY, pairId);
             localStorage.setItem(PAIR_PIN_KEY, pin);
 
+            // Wypchnij household members do Supabase
+            for (const member of getHousehold()) {
+                await pushHouseholdMember(member);
+            }
             // Wypchnij aktualny plan do Supabase
             for (const [k, recipe] of Object.entries(currentPlan)) {
                 if (!recipe) continue;
@@ -323,8 +376,36 @@
     function renderSyncUI() {
         const el = document.getElementById('sync-ui');
         if (!el) return;
+
+        // Sekcja edycji profili osób
+        const household = getHousehold();
+        const householdHTML = `
+            <div style="margin-bottom:20px;">
+                <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:10px;">👥 Profile osób</div>
+                ${household.map(m => `
+                    <div class="household-member-card" id="hm-${m.id}">
+                        <div class="household-member-row">
+                            <input type="text" class="household-emoji-input" value="${m.emoji}" id="hm-emoji-${m.id}"
+                                maxlength="4" title="Emoji">
+                            <input type="text" class="household-name-input" value="${sanitize(m.name)}" id="hm-name-${m.id}"
+                                placeholder="Imię" maxlength="20">
+                        </div>
+                        <div class="household-member-row" style="margin-bottom:0;">
+                            <div class="household-kcal-wrap" style="flex:1;">
+                                <span class="household-kcal-label" style="margin-right:6px;">Limit:</span>
+                                <input type="number" class="household-kcal-input" value="${m.kcalLimit}" id="hm-kcal-${m.id}"
+                                    min="800" max="5000" step="50" title="Limit kcal">
+                                <span class="household-kcal-label">kcal</span>
+                            </div>
+                            <button class="btn btn-secondary" style="padding:8px 14px;font-size:13px;" onclick="saveHouseholdMember('${m.id}')">💾 Zapisz</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>`;
+
         if (syncPairId) {
-            el.innerHTML = `
+            el.innerHTML = householdHTML + `
+                <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:10px;">☁️ Synchronizacja</div>
                 <div class="sync-status-row">
                     <span class="sync-status-dot ${syncStatus}" id="sync-dot"></span>
                     <span id="sync-txt">${{connected:'Połączono ✓',connecting:'Łączenie...',offline:'Offline',error:'Błąd'}[syncStatus]||syncStatus}</span>
@@ -333,7 +414,8 @@
                 <div class="sync-pin-display">${syncPin||'------'}</div>
                 <button class="sync-btn secondary" style="width:100%;margin-top:12px;" onclick="syncDisconnect()">🔌 Odłącz</button>`;
         } else {
-            el.innerHTML = `
+            el.innerHTML = householdHTML + `
+                <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:10px;">☁️ Synchronizacja</div>
                 <div class="sync-pair-mode">
                     <div class="sync-pair-tab ${syncTab==='new'?'active':''}" onclick="syncTab='new';renderSyncUI()">📱 Nowa para</div>
                     <div class="sync-pair-tab ${syncTab==='join'?'active':''}" onclick="syncTab='join';renderSyncUI()">🔗 Dołącz</div>
@@ -347,6 +429,17 @@
                     <button id="sync-join-btn" class="sync-btn primary" style="width:100%;margin-top:12px;" onclick="syncJoinPair()">🔗 Połącz</button>
                 `}`;
         }
+    }
+
+    function saveHouseholdMember(id) {
+        const name = document.getElementById('hm-name-' + id)?.value.trim();
+        const emoji = document.getElementById('hm-emoji-' + id)?.value.trim();
+        const kcalLimit = parseInt(document.getElementById('hm-kcal-' + id)?.value) || 2000;
+        if (!name) { showToast('❌ Imię nie może być puste'); return; }
+        updateMember(id, { name, emoji, kcalLimit: Math.max(800, Math.min(5000, kcalLimit)) });
+        showToast(`✅ Zapisano profil: ${emoji} ${name}`);
+        // Odśwież widoki
+        renderAll();
     }
 
     // ── renderAll ─────────────────────────────────────────────────

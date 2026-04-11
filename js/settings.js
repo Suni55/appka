@@ -100,13 +100,13 @@
     }
 
     function getBreakfastText() {
-        const dayMap = {0:'sun',1:'mon',2:'tue',3:'wed',4:'thu',5:'fri',6:'sat'};
-        const dayId = dayMap[new Date().getDay()];
-        const p1 = currentPlan[`${dayId}-breakfast-person1`];
-        const p2 = currentPlan[`${dayId}-breakfast-person2`];
-        if (p1 && p2 && p1 !== p2) return `Ona: ${p1} | On: ${p2}`;
-        if (p1) return p1;
-        if (p2) return p2;
+        const dayId = todayKey();
+        const household = getHousehold();
+        const texts = household.map(m => {
+            const recipe = currentPlan[`${dayId}-breakfast-${m.id}`];
+            return recipe ? `${m.name}: ${recipe}` : null;
+        }).filter(Boolean);
+        if (texts.length) return texts.join(' | ');
         return 'Zajrzyj do planu posiłków';
     }
 

@@ -1,5 +1,5 @@
 // ─── STAŁE KONFIGURACYJNE ──────────────────────────────────
-    const APP_VERSION = '2.0';
+    const APP_VERSION = '2.1';
     const KCAL_LOW     = 500;   // Próg "nisko-kaloryczne" (kcal)
     const KCAL_HIGH    = 700;   // Próg "wysoko-kaloryczne" (kcal)
     const DEBOUNCE_DELAY      = 150;  // ms — opóźnienie dla listy zakupów
@@ -32,7 +32,8 @@
         {id:'thu',name:'Czwartek'},{id:'fri',name:'Piątek'},{id:'sat',name:'Sobota'},{id:'sun',name:'Niedziela'}
     ];
     const MEALS = [
-        {id:'breakfast',name:'Śniadanie'},{id:'lunch',name:'Obiad'},{id:'dinner',name:'Kolacja'}
+        {id:'breakfast',name:'Śniadanie'},{id:'brunch',name:'II Śniadanie'},
+        {id:'lunch',name:'Obiad'},{id:'dinner',name:'Kolacja'}
     ];
     const UNIT_CONVERSIONS = {
         'banan': {grams:120,unit:'szt'}, 'jabłko': {grams:150,unit:'szt'}, 'gruszka': {grams:130,unit:'szt'},
@@ -330,8 +331,42 @@
         renderCalendar();
     }
 
+    // ─── GOSPODARSTWO DOMOWE ──────────────────────────────────
+    const DEFAULT_HOUSEHOLD = [
+        { id: 'person1', name: 'Ona', emoji: '💁‍♀️', kcalLimit: 1800 },
+        { id: 'person2', name: 'On', emoji: '💁‍♂️', kcalLimit: 2000 }
+    ];
+
+    // Migracja: inicjalizuj household jeśli nie istnieje
+    if (!localStorage.getItem('household')) {
+        localStorage.setItem('household', JSON.stringify(DEFAULT_HOUSEHOLD));
+    }
+
+    function getHousehold() {
+        try { return JSON.parse(localStorage.getItem('household')) || DEFAULT_HOUSEHOLD; }
+        catch(e) { return DEFAULT_HOUSEHOLD; }
+    }
+
+    function saveHousehold(household) {
+        localStorage.setItem('household', JSON.stringify(household));
+    }
+
+    function updateMember(id, changes) {
+        const household = getHousehold();
+        const member = household.find(m => m.id === id);
+        if (member) {
+            Object.assign(member, changes);
+            saveHousehold(household);
+            // Sync do Supabase
+            if (syncPairId) pushHouseholdMember(member);
+        }
+    }
+
+    function getMember(id) {
+        return getHousehold().find(m => m.id === id) || { id, name: id, emoji: '', kcalLimit: 2000 };
+    }
+
     // ─── PANEL MAKROSKŁADNIKÓW ─────────────────────────────────
-    const KCAL_LIMITS = { person1: 1800, person2: 2000 };
 
     function calcPersonMacro(dayId, person) {
         const total = { kcal: 0, b: 0, w: 0, t: 0 };
@@ -387,9 +422,9 @@
     }
 
     function renderMacroPanelHTML(dayId) {
-        const p1 = calcPersonMacro(dayId, 'person1');
-        const p2 = calcPersonMacro(dayId, 'person2');
-        if (!p1 && !p2) return '';
+        const household = getHousehold();
+        const macros = household.map(m => ({ member: m, macro: calcPersonMacro(dayId, m.id) }));
+        if (macros.every(m => !m.macro)) return '';
         const C = { b: '#2EC4B6', w: '#FF6B35', t: '#FFB347' };
         function card(macro, limit, label) {
             if (!macro) return `<div class="macro-person-card"><div class="macro-empty">Brak posiłków</div></div>`;
@@ -409,8 +444,7 @@
         return `<div class="macro-panel" style="margin-top:14px;">
             <div class="macro-panel-title">📊 Makroskładniki dnia</div>
             <div class="macro-people-grid">
-                ${card(p1, 1800, '💁‍♀️ Ona')}
-                ${card(p2, 2000, '💁‍♂️ On')}
+                ${macros.map(({ member, macro }) => card(macro, member.kcalLimit, `${member.emoji} ${member.name}`)).join('')}
             </div>
         </div>`;
     }
@@ -419,15 +453,14 @@
         const el = document.getElementById('macro-panel-container');
         if (!el) return;
 
-        const p1 = calcPersonMacro(dayId, 'person1');
-        const p2 = calcPersonMacro(dayId, 'person2');
+        const household = getHousehold();
+        const C = { b: '#2EC4B6', w: '#FF6B35', t: '#FFB347' };
+        const macros = household.map(m => ({ member: m, macro: calcPersonMacro(dayId, m.id) }));
 
-        if (!p1 && !p2) {
+        if (macros.every(m => !m.macro)) {
             el.innerHTML = '';
             return;
         }
-
-        const C = { b: '#2EC4B6', w: '#FF6B35', t: '#FFB347' };
 
         function renderPersonCard(person, macro, limit, label) {
             if (!macro) return `<div class="macro-person-card"><div class="macro-empty">Brak posiłków</div></div>`;
@@ -454,7 +487,7 @@
                     </div>
                 </div>
                 <div class="macro-progress-bar">
-                    <div class="macro-progress-fill ${over ? 'macro-progress-over' : 'macro-progress-ok'}" 
+                    <div class="macro-progress-fill ${over ? 'macro-progress-over' : 'macro-progress-ok'}"
                          style="width:${Math.min(progress, 100)}%"></div>
                 </div>
                 <div class="macro-stats">
@@ -481,20 +514,17 @@
             <div class="macro-panel">
                 <div class="macro-panel-title">📊 Makroskładniki dnia</div>
                 <div class="macro-people-grid">
-                    ${renderPersonCard('person1', p1, KCAL_LIMITS.person1, '💁‍♀️ Ona')}
-                    ${renderPersonCard('person2', p2, KCAL_LIMITS.person2, '💁‍♂️ On')}
+                    ${macros.map(({ member, macro }) => renderPersonCard(member.id, macro, member.kcalLimit, `${member.emoji} ${member.name}`)).join('')}
                 </div>
             </div>`;
 
         requestAnimationFrame(() => {
-            if (p1) {
-                const cv1 = document.getElementById('macro-donut-person1');
-                if (cv1) drawDonut(cv1, [p1.b * 4, p1.w * 4, p1.t * 9], [C.b, C.w, C.t]);
-            }
-            if (p2) {
-                const cv2 = document.getElementById('macro-donut-person2');
-                if (cv2) drawDonut(cv2, [p2.b * 4, p2.w * 4, p2.t * 9], [C.b, C.w, C.t]);
-            }
+            macros.forEach(({ member, macro }) => {
+                if (macro) {
+                    const cv = document.getElementById('macro-donut-' + member.id);
+                    if (cv) drawDonut(cv, [macro.b * 4, macro.w * 4, macro.t * 9], [C.b, C.w, C.t]);
+                }
+            });
         });
     }
 

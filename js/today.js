@@ -37,17 +37,17 @@
 
     function renderEatenBar(dayId) {
         const eaten = loadEaten();
-        const e1 = calcEatenKcal(dayId, 'person1');
-        const e2 = calcEatenKcal(dayId, 'person2');
-        const p1 = calcPlannedKcal(dayId, 'person1');
-        const p2 = calcPlannedKcal(dayId, 'person2');
-        const total = p1 + p2;
-        const eatenTotal = e1 + e2;
+        const household = getHousehold();
+        let total = 0, eatenTotal = 0;
+        const personStats = household.map(member => {
+            const e = calcEatenKcal(dayId, member.id);
+            const p = calcPlannedKcal(dayId, member.id);
+            const pl = MEALS.filter(m => currentPlan[`${dayId}-${m.id}-${member.id}`]).length;
+            const ea = MEALS.filter(m => eaten[eatenKey(dayId, m.id, member.id)] && currentPlan[`${dayId}-${m.id}-${member.id}`]).length;
+            total += p; eatenTotal += e;
+            return { member, e, pl, ea };
+        });
         const pct = total > 0 ? Math.min(100, Math.round(eatenTotal / total * 100)) : 0;
-        const pl1 = MEALS.filter(m => currentPlan[`${dayId}-${m.id}-person1`]).length;
-        const pl2 = MEALS.filter(m => currentPlan[`${dayId}-${m.id}-person2`]).length;
-        const ea1 = MEALS.filter(m => eaten[eatenKey(dayId, m.id, 'person1')] && currentPlan[`${dayId}-${m.id}-person1`]).length;
-        const ea2 = MEALS.filter(m => eaten[eatenKey(dayId, m.id, 'person2')] && currentPlan[`${dayId}-${m.id}-person2`]).length;
         return `<div class="eaten-bar-wrap">
             <div class="eaten-bar-label">
                 <div class="eaten-bar-title">Postęp dnia</div>
@@ -55,8 +55,7 @@
             </div>
             <div class="eaten-bar-track"><div class="eaten-bar-fill" style="width:${pct}%"></div></div>
             <div class="eaten-persons">
-                <div class="eaten-person-bar">Ona: <span>${e1} kcal</span> · ${ea1}/${pl1} posiłków</div>
-                <div class="eaten-person-bar">On: <span>${e2} kcal</span> · ${ea2}/${pl2} posiłków</div>
+                ${personStats.map(s => `<div class="eaten-person-bar">${s.member.emoji} ${s.member.name}: <span>${s.e} kcal</span> · ${s.ea}/${s.pl} posiłków</div>`).join('')}
             </div>
         </div>`;
     }
@@ -67,38 +66,32 @@
         const dayNames = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
         const dayName = dayNames[now.getDay()];
         const dateStr = now.toLocaleDateString('pl-PL',{year:'numeric',month:'long',day:'numeric'});
-        const icons = {breakfast:'🌅',lunch:'🍽️',dinner:'🌙'};
-        const mealNames = {breakfast:'Śniadanie',lunch:'Obiad',dinner:'Kolacja'};
+        const icons = {breakfast:'🌅',brunch:'🥐',lunch:'🍽️',dinner:'🌙'};
+        const mealNames = {breakfast:'Śniadanie',brunch:'II Śniadanie',lunch:'Obiad',dinner:'Kolacja'};
         const eaten = loadEaten();
 
         let html = `<div class="today-hero"><div class="today-day">${dayName}</div><div class="today-date">${dateStr}</div></div>`;
 
+        const household = getHousehold();
         let anyMeal = false;
         MEALS.forEach(meal => {
-            const p1 = currentPlan[`${dayId}-${meal.id}-person1`];
-            const p2 = currentPlan[`${dayId}-${meal.id}-person2`];
-            if (!p1 && !p2) return;
+            const personData = household.map(m => ({
+                member: m,
+                recipe: currentPlan[`${dayId}-${meal.id}-${m.id}`],
+                isEaten: eaten[eatenKey(dayId, meal.id, m.id)]
+            }));
+            if (personData.every(p => !p.recipe)) return;
             anyMeal = true;
-            const e1 = eaten[eatenKey(dayId, meal.id, 'person1')];
-            const e2 = eaten[eatenKey(dayId, meal.id, 'person2')];
             html += `<div class="meal-card-today">
-                <div class="meal-card-header"><div class="meal-icon">${icons[meal.id]}</div><div class="meal-time">${mealNames[meal.id]}</div></div>
-                <div class="person-meal">
-                    <div class="person-label">Ona</div>
+                <div class="meal-card-header"><div class="meal-icon">${icons[meal.id] || '🍴'}</div><div class="meal-time">${mealNames[meal.id] || meal.name}</div></div>
+                ${personData.map(p => `<div class="person-meal">
+                    <div class="person-label">${p.member.emoji} ${p.member.name}</div>
                     <div class="person-meal-row">
-                        <div class="recipe-pill ${p1?'':'empty'}${e1?' meal-eaten':''}" ${p1?`onclick="goToRecipe('${p1.replace(/'/g,"\\'")}')"`:''}>
-                            ${p1||'Nie zaplanowano'}${p1?macroPills(p1):''}</div>
-                        ${p1?`<button class="eaten-btn ${e1?'eaten':'not-eaten'}" onclick="toggleEaten('${dayId}','${meal.id}','person1')">${e1?'✓':'○'}</button>`:''}
+                        <div class="recipe-pill ${p.recipe?'':'empty'}${p.isEaten?' meal-eaten':''}" ${p.recipe?`onclick="goToRecipe('${p.recipe.replace(/'/g,"\\'")}')"`:''}>
+                            ${p.recipe||'Nie zaplanowano'}${p.recipe?macroPills(p.recipe):''}</div>
+                        ${p.recipe?`<button class="eaten-btn ${p.isEaten?'eaten':'not-eaten'}" onclick="toggleEaten('${dayId}','${meal.id}','${p.member.id}')">${p.isEaten?'✓':'○'}</button>`:''}
                     </div>
-                </div>
-                <div class="person-meal">
-                    <div class="person-label">On</div>
-                    <div class="person-meal-row">
-                        <div class="recipe-pill ${p2?'':'empty'}${e2?' meal-eaten':''}" ${p2?`onclick="goToRecipe('${p2.replace(/'/g,"\\'")}')"`:''}>
-                            ${p2||'Nie zaplanowano'}${p2?macroPills(p2):''}</div>
-                        ${p2?`<button class="eaten-btn ${e2?'eaten':'not-eaten'}" onclick="toggleEaten('${dayId}','${meal.id}','person2')">${e2?'✓':'○'}</button>`:''}
-                    </div>
-                </div>
+                </div>`).join('')}
             </div>`;
         });
 

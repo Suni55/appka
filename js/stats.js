@@ -53,14 +53,11 @@
         const el = document.getElementById('stats-container');
         if (!el) return;
 
+        const household = getHousehold();
+
         // Oblicz max dla skalowania pasków (wspólna skala)
-        const e1 = calcStats('person1', statsRange);
-        const e2 = calcStats('person2', statsRange);
-        const maxCount = Math.max(
-            e1.length ? e1[0][1] : 0,
-            e2.length ? e2[0][1] : 0,
-            1
-        );
+        const allStats = household.map(m => calcStats(m.id, statsRange));
+        const maxCount = Math.max(...allStats.map(e => e.length ? e[0][1] : 0), 1);
 
         const totalEntries = Object.keys(currentPlan).filter(k => currentPlan[k]).length;
         if (!totalEntries) { el.innerHTML = ''; return; }
@@ -76,8 +73,7 @@
                 ).join('')}
             </div>
             <div class="stats-persons">
-                ${renderStatsCol('person1', '👩 Ona', maxCount)}
-                ${renderStatsCol('person2', '👨 On', maxCount)}
+                ${household.map(m => renderStatsCol(m.id, `${m.emoji} ${m.name}`, maxCount)).join('')}
             </div>
         </div>`;
     }

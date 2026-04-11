@@ -18,44 +18,39 @@
                 </div>
             </div>`;
 
+        const household = getHousehold();
         MEALS.forEach(meal => {
-            const k1 = `${dateStr}-${meal.id}-person1`;
-            const k2 = `${dateStr}-${meal.id}-person2`;
-            const v1 = currentPlan[k1] || '';
-            const v2 = currentPlan[k2] || '';
             html += `<div class="meal-section">
                 <div class="meal-label">${meal.name}</div>
-                <div class="persons-grid">
-                    <div>
-                        <div class="person-label" style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>Ona</span>
-                            ${v1 ? `<button onclick="copyMealTo('${dateStr}','${meal.id}','person1','person2')" class="btn-copy-meal-small">→</button>` : ''}
-                        </div>
-                        <div class="autocomplete-wrapper">
-                            ${v1 ?
-                                `<div class="recipe-display" onclick="clearRecipe('${k1}')" title="Kliknij aby zmienić">${v1}${macroPills(v1)}</div>` :
-                                `<input type="text" id="inp-${k1}" class="recipe-input" value="" placeholder="Wpisz lub wybierz..."
-                                    oninput="onRecipeInput('${k1}',this.value)" onfocus="showAC('${k1}',this.value)" onblur="hideACDelayed('${k1}')" autocomplete="off">`
-                            }
-                            <div id="ac-${k1}" class="autocomplete-list"></div>
-                        </div>
+                <div class="persons-grid">`;
+
+            household.forEach((member, idx) => {
+                const k = `${dateStr}-${meal.id}-${member.id}`;
+                const v = currentPlan[k] || '';
+                // Przycisk kopiowania do drugiej osoby
+                const otherMembers = household.filter(m => m.id !== member.id);
+                const copyBtns = v ? otherMembers.map(other => {
+                    const arrow = idx === 0 ? '→' : '←';
+                    return `<button onclick="copyMealTo('${dateStr}','${meal.id}','${member.id}','${other.id}')" class="btn-copy-meal-small">${arrow}</button>`;
+                }).join('') : '';
+
+                html += `<div>
+                    <div class="person-label" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>${member.emoji} ${member.name}</span>
+                        ${copyBtns}
                     </div>
-                    <div>
-                        <div class="person-label" style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>On</span>
-                            ${v2 ? `<button onclick="copyMealTo('${dateStr}','${meal.id}','person2','person1')" class="btn-copy-meal-small">←</button>` : ''}
-                        </div>
-                        <div class="autocomplete-wrapper">
-                            ${v2 ?
-                                `<div class="recipe-display" onclick="clearRecipe('${k2}')" title="Kliknij aby zmienić">${v2}${macroPills(v2)}</div>` :
-                                `<input type="text" id="inp-${k2}" class="recipe-input" value="" placeholder="Wpisz lub wybierz..."
-                                    oninput="onRecipeInput('${k2}',this.value)" onfocus="showAC('${k2}',this.value)" onblur="hideACDelayed('${k2}')" autocomplete="off">`
-                            }
-                            <div id="ac-${k2}" class="autocomplete-list"></div>
-                        </div>
+                    <div class="autocomplete-wrapper">
+                        ${v ?
+                            `<div class="recipe-display" onclick="clearRecipe('${k}')" title="Kliknij aby zmienić">${v}${macroPills(v)}</div>` :
+                            `<input type="text" id="inp-${k}" class="recipe-input" value="" placeholder="Wpisz lub wybierz..."
+                                oninput="onRecipeInput('${k}',this.value)" onfocus="showAC('${k}',this.value)" onblur="hideACDelayed('${k}')" autocomplete="off">`
+                        }
+                        <div id="ac-${k}" class="autocomplete-list"></div>
                     </div>
-                </div>
-            </div>`;
+                </div>`;
+            });
+
+            html += `</div></div>`;
         });
         html += '</div>';
 
@@ -85,7 +80,7 @@
             // Dla obiadu tylko przepisy z listy OBIADY_LIST
             availableRecipes = PRZEPISY_DATA.przepisy.filter(p => OBIADY_LIST.includes(p));
         } else {
-            // Dla śniadania i kolacji tylko przepisy POZA listą OBIADY_LIST
+            // Dla śniadania, II śniadania i kolacji tylko przepisy POZA listą OBIADY_LIST
             availableRecipes = PRZEPISY_DATA.przepisy.filter(p => !OBIADY_LIST.includes(p));
         }
         
@@ -113,14 +108,14 @@
         const keyFrom = `${dayId}-${mealId}-${fromPerson}`;
         const keyTo = `${dayId}-${mealId}-${toPerson}`;
         const recipe = currentPlan[keyFrom];
-        
+
         if (recipe) {
             currentPlan[keyTo] = recipe;
             savePlan(currentPlan, keyTo);
             if (selectedDate) renderDayPanel(selectedDate);
             renderCalendar();
-            const fromLabel = fromPerson === 'person1' ? 'Ona' : 'On';
-            const toLabel = toPerson === 'person1' ? 'Ona' : 'On';
+            const fromLabel = getMember(fromPerson).name;
+            const toLabel = getMember(toPerson).name;
             showToast(`✅ Skopiowano ${fromLabel} → ${toLabel}: ${recipe}`);
         }
     }
@@ -195,7 +190,8 @@
     function exportPlanToPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        
+        const household = getHousehold();
+
         // Funkcja pomocnicza do konwersji polskich znaków (fallback jeśli czcionka nie obsługuje)
         function sanitizeText(text) {
             const charMap = {
@@ -206,98 +202,91 @@
             };
             return text.replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, char => charMap[char] || char);
         }
-        
+
+        const weekDays = getWeekDays(calWeekOffset);
+        const dayNames = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+
         // Tytuł
         doc.setFontSize(20);
         doc.text(sanitizeText('Plan Posiłków - Tydzień'), 105, 20, { align: 'center' });
-        
+
         let y = 35;
         const leftMargin = 14;
-        const maxLineWidth = 120; // Maksymalna szerokość dla nazwy przepisu
-        
-        DAYS.forEach(day => {
+        const maxLineWidth = 120;
+
+        weekDays.forEach(dayDate => {
+            const dk = dateKey(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate());
+            const dayName = dayNames[dayDate.getDay()];
+
             // Nazwa dnia
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.text(sanitizeText(day.name), leftMargin, y);
+            doc.text(sanitizeText(dayName), leftMargin, y);
             y += 8;
-            
+
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            
+
             MEALS.forEach(meal => {
-                const k1 = `${day.id}-${meal.id}-person1`;
-                const k2 = `${day.id}-${meal.id}-person2`;
-                const v1 = currentPlan[k1] || '—';
-                const v2 = currentPlan[k2] || '—';
-                
-                // Sprawdź czy jest miejsce (minimum 25mm na posiłek)
+                // Sprawdź czy jest miejsce
                 if (y > 265) {
                     doc.addPage();
                     y = 20;
                 }
-                
+
                 // Nazwa posiłku
                 doc.setFont(undefined, 'bold');
                 doc.text(sanitizeText(`${meal.name}:`), leftMargin + 6, y);
                 y += 5;
-                
+
                 doc.setFont(undefined, 'normal');
-                
-                // Osoba 1
-                const person1Text = sanitizeText(`Ona: ${v1}`);
-                const lines1 = doc.splitTextToSize(person1Text, maxLineWidth);
-                lines1.forEach((line, idx) => {
-                    doc.text(line, leftMargin + 11, y);
-                    if (idx === 0 && v1 !== '—' && NUTRITION_DATA[v1]) {
-                        // Makro w tej samej linii co pierwsza linia nazwy
-                        const n = NUTRITION_DATA[v1];
-                        doc.setFontSize(8);
-                        doc.text(`(${n.kcal} kcal, B:${n.b}g, W:${n.w}g, T:${n.t}g)`, 140, y);
-                        doc.setFontSize(10);
-                    }
-                    y += 5;
+
+                household.forEach(member => {
+                    const k = `${dk}-${meal.id}-${member.id}`;
+                    const v = currentPlan[k] || '—';
+
+                    const personText = sanitizeText(`${member.name}: ${v}`);
+                    const lines = doc.splitTextToSize(personText, maxLineWidth);
+                    lines.forEach((line, idx) => {
+                        doc.text(line, leftMargin + 11, y);
+                        if (idx === 0 && v !== '—' && NUTRITION_DATA[v]) {
+                            const n = NUTRITION_DATA[v];
+                            doc.setFontSize(8);
+                            doc.text(`(${n.kcal} kcal, B:${n.b}g, W:${n.w}g, T:${n.t}g)`, 140, y);
+                            doc.setFontSize(10);
+                        }
+                        y += 5;
+                    });
                 });
-                
-                // Osoba 2
-                const person2Text = sanitizeText(`On: ${v2}`);
-                const lines2 = doc.splitTextToSize(person2Text, maxLineWidth);
-                lines2.forEach((line, idx) => {
-                    doc.text(line, leftMargin + 11, y);
-                    if (idx === 0 && v2 !== '—' && NUTRITION_DATA[v2]) {
-                        // Makro w tej samej linii co pierwsza linia nazwy
-                        const n = NUTRITION_DATA[v2];
-                        doc.setFontSize(8);
-                        doc.text(`(${n.kcal} kcal, B:${n.b}g, W:${n.w}g, T:${n.t}g)`, 140, y);
-                        doc.setFontSize(10);
-                    }
-                    y += 5;
-                });
-                
-                y += 2; // Odstęp między posiłkami
+
+                y += 2;
             });
-            
-            y += 3; // Odstęp między dniami
+
+            y += 3;
         });
-        
-        // Zapisz PDF
+
         doc.save('plan-posilkow.pdf');
         showToast('📄 PDF wygenerowany!');
     }
     
     function copyWeekPlan() {
-        const text = DAYS.map(day => {
-            let dayText = `${day.name}:\n`;
+        const household = getHousehold();
+        const weekDays = getWeekDays(calWeekOffset);
+        const dayNames = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+
+        const text = weekDays.map(dayDate => {
+            const dk = dateKey(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate());
+            let dayText = `${dayNames[dayDate.getDay()]}:\n`;
             MEALS.forEach(meal => {
-                const k1 = `${day.id}-${meal.id}-person1`;
-                const k2 = `${day.id}-${meal.id}-person2`;
-                const v1 = currentPlan[k1] || '—';
-                const v2 = currentPlan[k2] || '—';
-                dayText += `  ${meal.name}: Ona: ${v1}, On: ${v2}\n`;
+                const parts = household.map(m => {
+                    const v = currentPlan[`${dk}-${meal.id}-${m.id}`] || '—';
+                    return `${m.name}: ${v}`;
+                }).join(', ');
+                dayText += `  ${meal.name}: ${parts}\n`;
             });
             return dayText;
         }).join('\n');
-        
+
         navigator.clipboard.writeText(text).then(() => {
             showToast('📋 Skopiowano plan do schowka!');
         });
@@ -398,6 +387,84 @@
         showToast('✅ Skopiowano!');
     }
     function closeCopyDayModal() { document.getElementById('copyday-overlay').classList.remove('active'); }
+
+    // ── Kopiowanie tygodnia ─────────────────────────────────────
+    function showCopyWeekModal() {
+        const sourceDays = getWeekDays(calWeekOffset);
+        const sourceKeys = [];
+        sourceDays.forEach(d => {
+            const dk = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+            Object.keys(currentPlan).filter(k => k.startsWith(dk + '-') && currentPlan[k]).forEach(k => sourceKeys.push(k));
+        });
+        if (!sourceKeys.length) { showToast('❌ Ten tydzień jest pusty!'); return; }
+
+        const firstDay = sourceDays[0];
+        const lastDay = sourceDays[6];
+        const months = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
+        const sourceLabel = `${firstDay.getDate()} ${months[firstDay.getMonth()]} – ${lastDay.getDate()} ${months[lastDay.getMonth()]}`;
+
+        // Opcje docelowe: bieżący tydzień, następny, za 2 tygodnie
+        const options = [];
+        for (let offset = -2; offset <= 4; offset++) {
+            if (offset === calWeekOffset) continue; // pomiń źródłowy tydzień
+            const targetDays = getWeekDays(offset);
+            const tf = targetDays[0], tl = targetDays[6];
+            let label;
+            if (offset === 0) label = 'Bieżący tydzień';
+            else if (offset === calWeekOffset + 1) label = 'Następny tydzień';
+            else label = `${tf.getDate()} ${months[tf.getMonth()]} – ${tl.getDate()} ${months[tl.getMonth()]}`;
+            options.push({ offset, label });
+        }
+
+        const box = document.getElementById('copyday-box');
+        box.innerHTML = `<div class="sync-title">📋 Kopiuj tydzień</div>
+            <p style="color:var(--text-secondary);margin-bottom:16px;">
+                Skopiuj plan z <strong>${sourceLabel}</strong> (${sourceKeys.length} posiłków) do:</p>
+            ${options.map(o => `
+                <div class="sync-option" onclick="executeCopyWeek(${calWeekOffset}, ${o.offset})">
+                    <div class="sync-option-title">${o.label}</div>
+                </div>`).join('')}
+            <button class="sync-btn sync-btn-gray" onclick="closeCopyDayModal()">Anuluj</button>`;
+        document.getElementById('copyday-overlay').classList.add('active');
+    }
+
+    function executeCopyWeek(sourceOffset, targetOffset) {
+        const sourceDays = getWeekDays(sourceOffset);
+        const targetDays = getWeekDays(targetOffset);
+
+        // Sprawdź czy docelowy tydzień ma już posiłki
+        let targetHasMeals = false;
+        targetDays.forEach(d => {
+            const dk = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+            if (Object.keys(currentPlan).some(k => k.startsWith(dk + '-') && currentPlan[k])) targetHasMeals = true;
+        });
+        if (targetHasMeals && !confirm('Docelowy tydzień ma już posiłki. Nadpisać?')) return;
+
+        // Kopiuj dzień po dniu
+        let count = 0;
+        for (let i = 0; i < 7; i++) {
+            const srcDk = dateKey(sourceDays[i].getFullYear(), sourceDays[i].getMonth(), sourceDays[i].getDate());
+            const tgtDk = dateKey(targetDays[i].getFullYear(), targetDays[i].getMonth(), targetDays[i].getDate());
+
+            // Usuń istniejące posiłki docelowego dnia
+            Object.keys(currentPlan).filter(k => k.startsWith(tgtDk + '-')).forEach(k => delete currentPlan[k]);
+
+            // Kopiuj z źródłowego dnia
+            Object.keys(currentPlan).filter(k => k.startsWith(srcDk + '-') && currentPlan[k]).forEach(k => {
+                const newKey = k.replace(srcDk, tgtDk);
+                currentPlan[newKey] = currentPlan[k];
+                count++;
+            });
+        }
+
+        savePlan(currentPlan);
+        // Przejdź do docelowego tygodnia
+        calWeekOffset = targetOffset;
+        selectedDate = dateKey(targetDays[0].getFullYear(), targetDays[0].getMonth(), targetDays[0].getDate());
+        renderCalendar();
+        closeCopyDayModal();
+        showToast(`✅ Skopiowano ${count} posiłków!`);
+    }
 
     function clearDay(dateStr) {
         const keys = Object.keys(currentPlan).filter(k => k.startsWith(dateStr + '-'));

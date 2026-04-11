@@ -68,6 +68,7 @@
                         <button class="cal-strip-btn" onclick="calPrevWeek()">‹</button>
                         <button class="cal-strip-btn" style="font-size:13px;padding:4px 8px;" onclick="calGoToday()">Dziś</button>
                         <button class="cal-strip-btn" onclick="calNextWeek()">›</button>
+                        <button class="btn-copy-week" onclick="showCopyWeekModal()" title="Kopiuj tydzień">📋</button>
                     </div>
                 </div>
                 <div class="cal-strip" id="cal-strip"></div>
@@ -211,7 +212,7 @@
             </div>
         </div>
         <div class="settings-section" id="sync-section">
-            <div class="settings-title">☁️ Synchronizacja</div>
+            <div class="settings-title">👥 Osoby i synchronizacja</div>
             <div id="sync-ui"><!-- wypełniane przez JS --></div>
         </div>
         <div class="settings-section">
@@ -221,7 +222,7 @@
                     <div class="settings-row-label">Wersja</div>
                     <div class="settings-row-desc">Plan Posiłków PWA</div>
                 </div>
-                <span style="font-weight:700;color:var(--text-secondary);">2.0</span>
+                <span style="font-weight:700;color:var(--text-secondary);">2.1</span>
             </div>
         </div>
     </div>

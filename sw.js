@@ -1,4 +1,4 @@
-const CACHE_NAME = 'plan-posilkow-v6';
+const CACHE_NAME = 'plan-posilkow-v7';
 
 const PRECACHE_URLS = [
   './',
