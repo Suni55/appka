@@ -168,7 +168,9 @@
     function updateOwned(key,val) {
         const n = parseFloat(val)||0;
         if (!n) delete ownedAmounts[key]; else ownedAmounts[key]=n;
-        saveOwnedAmounts(ownedAmounts); updateShoppingList();
+        saveOwnedAmounts(ownedAmounts);
+        if (!isSyncing && syncPairId) pushOwnedAmount(key, n);
+        updateShoppingList();
     }
     function updateStats(total, checked) {
         document.getElementById('total-items').textContent = total;

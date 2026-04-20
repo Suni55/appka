@@ -189,8 +189,10 @@
         const inp = document.getElementById('custom-product-input');
         const name = inp.value.trim();
         if (!name) return;
-        customProducts.push({ id: Date.now(), name, checked: false });
+        const product = { id: Date.now(), name, checked: false };
+        customProducts.push(product);
         saveCustomProducts(customProducts);
+        if (!isSyncing && syncPairId) pushCustomProduct(product);
         inp.value = '';
         inp.focus();
         updateShoppingList();
@@ -198,12 +200,19 @@
 
     function toggleCustomProduct(id) {
         const p = customProducts.find(p => p.id === id);
-        if (p) { p.checked = !p.checked; saveCustomProducts(customProducts); updateShoppingList(); }
+        if (p) {
+            p.checked = !p.checked;
+            saveCustomProducts(customProducts);
+            if (!isSyncing && syncPairId) pushCustomProduct(p);
+            updateShoppingList();
+        }
     }
 
     function deleteCustomProduct(id) {
+        const p = customProducts.find(p => p.id === id);
         customProducts = customProducts.filter(p => p.id !== id);
         saveCustomProducts(customProducts);
+        if (p && !isSyncing && syncPairId) pushCustomProduct(p, true);
         updateShoppingList();
     }
 

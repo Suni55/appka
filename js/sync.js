@@ -35,8 +35,10 @@
         saveSyncQueue();
         for (const op of todo) {
             try {
-                if (op.type === 'plan')    await pushPlanEntry(op.dayKey, op.mealId, op.person, op.recipe);
-                if (op.type === 'checked') await pushCheckedItem(op.itemKey, op.checked);
+                if (op.type === 'plan')          await pushPlanEntry(op.dayKey, op.mealId, op.person, op.recipe);
+                if (op.type === 'checked')       await pushCheckedItem(op.itemKey, op.checked);
+                if (op.type === 'owned')         await pushOwnedAmount(op.itemKey, op.amount);
+                if (op.type === 'customProduct') await pushCustomProduct(op.product, op.deleted);
             } catch (e) {
                 syncQueue.push(op); // z powrotem do kolejki
                 saveSyncQueue();
@@ -88,15 +90,18 @@
 
     // ── Pull: Supabase → localStorage ────────────────────────────
     async function pullAll() {
-        const [planRows, checkedRows] = await Promise.all([
-            sbFetch('meal_plan?pair_id=eq.' + syncPairId + '&select=day_key,meal_id,person,recipe'),
-            sbFetch('shopping_checked?pair_id=eq.' + syncPairId + '&select=item_key,checked')
+        const [planRows, checkedRows, ownedRows, customRows] = await Promise.all([
+            sbFetch('meal_plan?pair_id=eq.'        + syncPairId + '&select=day_key,meal_id,person,recipe'),
+            sbFetch('shopping_checked?pair_id=eq.' + syncPairId + '&select=item_key,checked'),
+            sbFetch('shopping_owned?pair_id=eq.'   + syncPairId + '&select=item_key,amount'),
+            sbFetch('custom_products?pair_id=eq.'  + syncPairId + '&select=product_id,name,checked')
         ]);
 
         // Pull household members (non-blocking)
         pullHouseholdMembers().catch(e => console.warn('[Sync] household pull failed:', e));
 
         isSyncing = true;
+
         // Plan
         const remotePlan = {};
         (planRows || []).forEach(r => {
@@ -105,17 +110,30 @@
         currentPlan = remotePlan;
         localStorage.setItem('mealPlan', JSON.stringify(currentPlan));
 
-        // Zakupy - odkoduj base64 z powrotem do oryginalnych kluczy
-        const remoteChecked = (checkedRows || [])
-            .filter(r => r.checked)
-            .map(r => {
-                try { return decodeURIComponent(escape(atob(r.item_key))); }
-                catch(e) { return r.item_key; } // fallback dla starych wpisów
-            });
-        checkedItems = remoteChecked;
+        // Kupione — odkoduj base64
+        const decodeKey = raw => { try { return decodeURIComponent(escape(atob(raw))); } catch(e) { return raw; } };
+        checkedItems = (checkedRows || []).filter(r => r.checked).map(r => decodeKey(r.item_key));
         localStorage.setItem('checkedItems', JSON.stringify(checkedItems));
-        isSyncing = false;
 
+        // Posiadane ilości — odkoduj base64
+        ownedAmounts = {};
+        (ownedRows || []).forEach(r => {
+            const key = decodeKey(r.item_key);
+            if (r.amount > 0) ownedAmounts[key] = r.amount;
+        });
+        localStorage.setItem('ownedAmounts', JSON.stringify(ownedAmounts));
+
+        // Własne produkty
+        if (customRows && customRows.length > 0) {
+            customProducts = customRows.map(r => ({
+                id: parseInt(r.product_id) || r.product_id,
+                name: r.name,
+                checked: r.checked || false
+            }));
+            localStorage.setItem('customProducts', JSON.stringify(customProducts));
+        }
+
+        isSyncing = false;
         renderAll();
     }
 
@@ -215,6 +233,63 @@
         }
     }
 
+    // ── Push: posiadane ilości ───────────────────────────────────
+    async function pushOwnedAmount(itemKey, amount) {
+        if (!syncPairId || isSyncing) return;
+        const safeKey = btoa(unescape(encodeURIComponent(itemKey)));
+        try {
+            if (amount > 0) {
+                await sbFetchWithRetry('shopping_owned', {
+                    method: 'POST',
+                    headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify({
+                        pair_id: syncPairId, item_key: safeKey,
+                        amount, updated_at: new Date().toISOString()
+                    })
+                });
+            } else {
+                await sbFetchWithRetry('shopping_owned?pair_id=eq.' + syncPairId +
+                    '&item_key=eq.' + encodeURIComponent(safeKey), {
+                    method: 'DELETE', headers: { 'Prefer': '' }
+                });
+            }
+        } catch(e) {
+            console.warn('[Sync] pushOwnedAmount failed, dodaję do kolejki:', e);
+            syncQueue.push({ type: 'owned', itemKey, amount });
+            saveSyncQueue();
+        }
+    }
+
+    // ── Push: własne produkty ────────────────────────────────────
+    async function pushCustomProduct(product, deleted = false) {
+        if (!syncPairId || isSyncing) return;
+        const productId = String(product.id);
+        try {
+            if (deleted) {
+                await sbFetchWithRetry('custom_products?pair_id=eq.' + syncPairId +
+                    '&product_id=eq.' + encodeURIComponent(productId), {
+                    method: 'DELETE', headers: { 'Prefer': '' }
+                });
+            } else {
+                await sbFetchWithRetry('custom_products', {
+                    method: 'POST',
+                    headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+                    body: JSON.stringify({
+                        pair_id: syncPairId,
+                        product_id: productId,
+                        name: product.name,
+                        checked: product.checked || false,
+                        updated_at: new Date().toISOString()
+                    })
+                });
+            }
+        } catch(e) {
+            console.warn('[Sync] pushCustomProduct failed, dodaję do kolejki:', e);
+            syncQueue.push({ type: 'customProduct', product, deleted });
+            saveSyncQueue();
+        }
+    }
+
     // ── Realtime przez Supabase JS SDK ───────────────────────────
     function subscribeRealtime() {
         if (!sbClient) { sbClient = initSupabaseClient(); }
@@ -253,17 +328,58 @@
                 isSyncing = true;
                 const { eventType, new: rec, old: oldRec } = payload;
                 const rawKey = rec ? rec.item_key : oldRec.item_key;
-                // Odkoduj base64
                 let key;
-                try { key = decodeURIComponent(escape(atob(rawKey))); }
-                catch(e) { key = rawKey; }
-
+                try { key = decodeURIComponent(escape(atob(rawKey))); } catch(e) { key = rawKey; }
                 if (eventType === 'DELETE' || (rec && !rec.checked)) {
                     checkedItems = checkedItems.filter(i => i !== key);
                 } else if (!checkedItems.includes(key)) {
                     checkedItems.push(key);
                 }
                 localStorage.setItem('checkedItems', JSON.stringify(checkedItems));
+                isSyncing = false;
+                updateShoppingList();
+            })
+            .on('postgres_changes', {
+                event: '*', schema: 'public', table: 'shopping_owned',
+                filter: 'pair_id=eq.' + syncPairId
+            }, (payload) => {
+                if (isSyncing) return;
+                isSyncing = true;
+                const { eventType, new: rec, old: oldRec } = payload;
+                const rawKey = rec ? rec.item_key : oldRec.item_key;
+                let key;
+                try { key = decodeURIComponent(escape(atob(rawKey))); } catch(e) { key = rawKey; }
+                if (eventType === 'DELETE') {
+                    delete ownedAmounts[key];
+                } else {
+                    if (rec.amount > 0) ownedAmounts[key] = rec.amount;
+                    else delete ownedAmounts[key];
+                }
+                localStorage.setItem('ownedAmounts', JSON.stringify(ownedAmounts));
+                isSyncing = false;
+                updateShoppingList();
+            })
+            .on('postgres_changes', {
+                event: '*', schema: 'public', table: 'custom_products',
+                filter: 'pair_id=eq.' + syncPairId
+            }, (payload) => {
+                if (isSyncing) return;
+                isSyncing = true;
+                const { eventType, new: rec, old: oldRec } = payload;
+                const productId = rec ? (parseInt(rec.product_id) || rec.product_id)
+                                      : (parseInt(oldRec.product_id) || oldRec.product_id);
+                if (eventType === 'DELETE') {
+                    customProducts = customProducts.filter(p => p.id != productId);
+                } else {
+                    const existing = customProducts.find(p => p.id == productId);
+                    if (existing) {
+                        existing.name    = rec.name;
+                        existing.checked = rec.checked || false;
+                    } else {
+                        customProducts.push({ id: productId, name: rec.name, checked: rec.checked || false });
+                    }
+                }
+                localStorage.setItem('customProducts', JSON.stringify(customProducts));
                 isSyncing = false;
                 updateShoppingList();
             })
@@ -323,6 +439,14 @@
                 const parts = k.split('-');
                 const person = parts.pop(), mealId = parts.pop(), dayKey = parts.join('-');
                 await pushPlanEntry(dayKey, mealId, person, recipe);
+            }
+            // Wypchnij posiadane ilości
+            for (const [itemKey, amount] of Object.entries(ownedAmounts)) {
+                if (amount > 0) await pushOwnedAmount(itemKey, amount);
+            }
+            // Wypchnij własne produkty
+            for (const product of customProducts) {
+                await pushCustomProduct(product);
             }
             sbClient = initSupabaseClient();
             subscribeRealtime();
