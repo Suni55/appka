@@ -75,18 +75,35 @@
         const el = document.getElementById('shopping-list');
         if (!el) return;
         const items = calcShoppingList();
+
         if (!items.length && !customProducts.length) {
             el.innerHTML = `<div class="empty-state"><div class="empty-icon">🛒</div>
                 <div style="font-size:16px;font-weight:600;">Brak produktów</div>
                 <div style="font-size:14px;margin-top:6px;">Dodaj posiłki do planu lub wpisz własne produkty powyżej</div></div>`;
-            updateStats(0,0); return;
+            updateStats(0, 0); return;
         }
 
-        // Podziel na niekupione i kupione
-        const unchecked = items.filter(i => !checkedItems.includes(`${i.name}|||${i.unit}`));
-        const checked   = items.filter(i =>  checkedItems.includes(`${i.name}|||${i.unit}`));
-        unchecked.sort((a,b) => a.name.localeCompare(b.name, 'pl'));
-        checked.sort((a,b)   => a.name.localeCompare(b.name, 'pl'));
+        // Scal przepisowe i własne produkty w jedną posortowaną listę
+        const allItems = [
+            ...items.map(i => ({
+                type: 'recipe',
+                name: i.name,
+                amount: i.amount,
+                unit: i.unit,
+                isChecked: checkedItems.includes(`${i.name}|||${i.unit}`)
+            })),
+            ...customProducts.map(p => ({
+                type: 'custom',
+                id: p.id,
+                name: p.name,
+                isChecked: p.checked
+            }))
+        ];
+
+        // Podziel na niekupione / kupione i sortuj alfabetycznie
+        const sort = arr => arr.sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+        const unchecked = sort(allItems.filter(i => !i.isChecked));
+        const checked   = sort(allItems.filter(i =>  i.isChecked));
 
         let html = `<div class="shopping-header-row">
             <div></div>
@@ -95,53 +112,47 @@
             <div class="header-label">Do kupienia</div>
         </div>`;
 
-        let totalItems=0, checkedCount=0;
+        let totalItems = 0, checkedCount = 0;
 
         [...unchecked, ...checked].forEach(item => {
-            const key = `${item.name}|||${item.unit}`;
-            const isChecked = checkedItems.includes(key);
-            const owned = ownedAmounts[key] || 0;
-            const toBuy = Math.max(0, item.amount - owned);
-            if (toBuy > 0) totalItems++;
-            if (isChecked) checkedCount++;
+            if (item.type === 'recipe') {
+                const key = `${item.name}|||${item.unit}`;
+                const owned  = ownedAmounts[key] || 0;
+                const toBuy  = Math.max(0, item.amount - owned);
+                if (toBuy > 0)    totalItems++;
+                if (item.isChecked) checkedCount++;
 
-            const conv = convertUnits(item.name, item.amount, item.unit);
-            const neededDisplay = conv.original ? `${conv.amount} ${conv.unit} ${conv.original}` : `${conv.amount} ${conv.unit}`;
-            const toBuyAmount = Math.round(toBuy*10)/10;
-            const toBuyDisplay = `${toBuyAmount} ${item.unit}`;
+                const conv = convertUnits(item.name, item.amount, item.unit);
+                const neededDisplay = conv.original
+                    ? `${conv.amount} ${conv.unit} ${conv.original}`
+                    : `${conv.amount} ${conv.unit}`;
+                const toBuyDisplay = `${Math.round(toBuy * 10) / 10} ${item.unit}`;
 
-            html += `<div class="shopping-item ${isChecked?'checked':''}">
-                <div class="checkbox ${isChecked?'checked':''}" onclick="toggleItem('${key}')"></div>
-                <div class="item-info">
-                    <div class="item-name">${sanitize(item.name)}</div>
-                    <div class="item-details">Potrzebne: ${sanitize(neededDisplay)}</div>
-                </div>
-                <input type="number" class="item-input" value="${owned||''}" placeholder="0"
-                    onchange="updateOwned('${key}',this.value)" onclick="event.stopPropagation()">
-                <div class="item-needed">${sanitize(toBuyDisplay)}</div>
-            </div>`;
-        });
-
-        // Własne produkty
-        const customUnchecked = customProducts.filter(p => !p.checked);
-        const customChecked   = customProducts.filter(p =>  p.checked);
-
-        if (customProducts.length > 0) {
-            if (items.length > 0) {
-                html += `<div class="custom-divider">Własne produkty</div>`;
-            }
-            [...customUnchecked, ...customChecked].forEach(p => {
-                if (!p.checked) totalItems++;
-                if (p.checked)  checkedCount++;
-                html += `<div class="shopping-item ${p.checked ? 'checked' : ''}">
-                    <div class="checkbox ${p.checked ? 'checked' : ''}" onclick="toggleCustomProduct(${p.id})"></div>
-                    <div class="item-info" style="grid-column: span 2;">
-                        <div class="item-name">${sanitize(p.name)}</div>
+                html += `<div class="shopping-item ${item.isChecked ? 'checked' : ''}">
+                    <div class="checkbox ${item.isChecked ? 'checked' : ''}" onclick="toggleItem('${key}')"></div>
+                    <div class="item-info">
+                        <div class="item-name">${sanitize(item.name)}</div>
+                        <div class="item-details">Potrzebne: ${sanitize(neededDisplay)}</div>
                     </div>
-                    <button class="custom-item-delete" onclick="deleteCustomProduct(${p.id})" title="Usuń">✕</button>
+                    <input type="number" class="item-input" value="${owned || ''}" placeholder="0"
+                        onchange="updateOwned('${key}',this.value)" onclick="event.stopPropagation()">
+                    <div class="item-needed">${sanitize(toBuyDisplay)}</div>
                 </div>`;
-            });
-        }
+            } else {
+                // własny produkt — zintegrowany alfabetycznie
+                if (!item.isChecked) totalItems++;
+                else                 checkedCount++;
+
+                html += `<div class="shopping-item ${item.isChecked ? 'checked' : ''}">
+                    <div class="checkbox ${item.isChecked ? 'checked' : ''}" onclick="toggleCustomProduct(${item.id})"></div>
+                    <div class="item-info" style="grid-column: span 2;">
+                        <div class="item-name">${sanitize(item.name)}</div>
+                        <div class="item-details" style="font-size:11px;color:var(--text-secondary);">✏️ własny produkt</div>
+                    </div>
+                    <button class="custom-item-delete" onclick="deleteCustomProduct(${item.id})" title="Usuń">✕</button>
+                </div>`;
+            }
+        });
 
         el.innerHTML = html;
         updateStats(totalItems, checkedCount);
