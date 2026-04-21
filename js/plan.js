@@ -75,13 +75,13 @@
         const mealType = parts[3]; // breakfast/lunch/dinner
         
         // Filtruj przepisy według typu posiłku
-        let availableRecipes = PRZEPISY_DATA.przepisy;
+        let availableRecipes;
         if (mealType === 'lunch') {
-            // Dla obiadu tylko przepisy z listy OBIADY_LIST
             availableRecipes = PRZEPISY_DATA.przepisy.filter(p => OBIADY_LIST.includes(p));
+        } else if (mealType === 'brunch') {
+            availableRecipes = PRZEPISY_DATA.przepisy.filter(p => BRUNCH_LIST.includes(p));
         } else {
-            // Dla śniadania, II śniadania i kolacji tylko przepisy POZA listą OBIADY_LIST
-            availableRecipes = PRZEPISY_DATA.przepisy.filter(p => !OBIADY_LIST.includes(p));
+            availableRecipes = PRZEPISY_DATA.przepisy.filter(p => !OBIADY_LIST.includes(p) && !BRUNCH_LIST.includes(p));
         }
         
         const filtered = availableRecipes.filter(p => p.toLowerCase().includes(q.toLowerCase()));

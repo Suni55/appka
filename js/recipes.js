@@ -136,7 +136,8 @@
                         if (caloriesFilter === 'high'   && n.kcal <= KCAL_HIGH) return false;
                     }
                 }
-                if (typeFilter === 'breakfast' && OBIADY_LIST.includes(p)) return false;
+                if (typeFilter === 'breakfast' && (OBIADY_LIST.includes(p) || BRUNCH_LIST.includes(p))) return false;
+                if (typeFilter === 'brunch' && !BRUNCH_LIST.includes(p)) return false;
                 if (typeFilter === 'lunch' && !OBIADY_LIST.includes(p)) return false;
                 return true;
             });
@@ -171,7 +172,8 @@
                     if (caloriesFilter === 'high'   && n.kcal <= KCAL_HIGH) return null;
                 }
             }
-            if (typeFilter === 'breakfast' && OBIADY_LIST.includes(p)) return null;
+            if (typeFilter === 'breakfast' && (OBIADY_LIST.includes(p) || BRUNCH_LIST.includes(p))) return null;
+            if (typeFilter === 'brunch' && !BRUNCH_LIST.includes(p)) return null;
             if (typeFilter === 'lunch' && !OBIADY_LIST.includes(p)) return null;
 
             const score = query ? fuzzyScore(query, p) : 100;

@@ -1,0 +1,446 @@
+// ─── II ŚNIADANIA — rozszerzenie bazy przepisów ─────────────
+// Plik ładowany po przepisy.js — bezpiecznie rozszerza PRZEPISY_DATA i NUTRITION_DATA
+(function () {
+
+    const NOWE_NAZWY = [
+        "Banan w owsiance instant",
+        "Budyń chia z mango",
+        "Budyń proteinowy z bananem",
+        "Hummus z marchewką i ogórkiem",
+        "Jabłko z masłem orzechowym",
+        "Jajko na twardo z pomidorem i pieczywem chrupkim",
+        "Jogurt grecki z bananem i granolą",
+        "Jogurt skyr z miodem i orzechami",
+        "Kanapka ryżowa z awokado",
+        "Kanapka z pastą jajeczną (mini)",
+        "Koktajl bananowo-szpinakowy",
+        "Koktajl proteinowy z owocami leśnymi",
+        "Koktajl truskawkowo-bananowy",
+        "Krakersy z serkiem i rzodkiewką",
+        "Marchewka z hummusem i orzechami",
+        "Miks orzechów z suszonymi owocami",
+        "Mini wrap z tuńczykiem",
+        "Nocna owsianka z orzechami włoskimi",
+        "Owsianka overnight z jagodami",
+        "Placuszek ryżowy z awokado i jajkiem",
+        "Pudding ryżowy z cynamonem",
+        "Sałatka owocowa z jogurtem",
+        "Serek wiejski z ogórkiem i koprem",
+        "Smoothie bowl z borówkami",
+        "Smoothie mango-marchewka",
+        "Smoothie z awokado i kakao",
+        "Tost z ricottą i pomidorem",
+        "Twarożek waniliowy z malinami",
+        "Twarożek z rzodkiewką na pieczywie chrupkim",
+        "Wrap z hummusem i warzywami",
+    ];
+
+    const NOWE_SKLADNIKI = {
+        "Banan w owsiance instant": [
+            { skladnik: "Płatki owsiane instant", ilosc: 40, jednostka: "g" },
+            { skladnik: "Mleko 2%", ilosc: 150, jednostka: "ml" },
+            { skladnik: "Banan", ilosc: 120, jednostka: "g" },
+        ],
+        "Budyń chia z mango": [
+            { skladnik: "Nasiona chia", ilosc: 25, jednostka: "g" },
+            { skladnik: "Mleko migdałowe", ilosc: 150, jednostka: "ml" },
+            { skladnik: "Mango", ilosc: 100, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 5, jednostka: "g" },
+        ],
+        "Budyń proteinowy z bananem": [
+            { skladnik: "Mleko 2%", ilosc: 200, jednostka: "ml" },
+            { skladnik: "Odżywka białkowa waniliowa", ilosc: 30, jednostka: "g" },
+            { skladnik: "Banan", ilosc: 100, jednostka: "g" },
+        ],
+        "Hummus z marchewką i ogórkiem": [
+            { skladnik: "Hummus", ilosc: 80, jednostka: "g" },
+            { skladnik: "Marchewka", ilosc: 150, jednostka: "g" },
+            { skladnik: "Ogórek świeży", ilosc: 100, jednostka: "g" },
+        ],
+        "Jabłko z masłem orzechowym": [
+            { skladnik: "Jabłko", ilosc: 200, jednostka: "g" },
+            { skladnik: "Masło orzechowe", ilosc: 20, jednostka: "g" },
+        ],
+        "Jajko na twardo z pomidorem i pieczywem chrupkim": [
+            { skladnik: "Jajko", ilosc: 2, jednostka: "szt" },
+            { skladnik: "Pomidor", ilosc: 160, jednostka: "g" },
+            { skladnik: "Pieczywo chrupkie", ilosc: 18, jednostka: "g" },
+            { skladnik: "Sól", ilosc: 1, jednostka: "g" },
+            { skladnik: "Pieprz czarny", ilosc: 1, jednostka: "g" },
+        ],
+        "Jogurt grecki z bananem i granolą": [
+            { skladnik: "Jogurt grecki 2%", ilosc: 150, jednostka: "g" },
+            { skladnik: "Banan", ilosc: 80, jednostka: "g" },
+            { skladnik: "Granola", ilosc: 25, jednostka: "g" },
+        ],
+        "Jogurt skyr z miodem i orzechami": [
+            { skladnik: "Jogurt skyr bez laktozy", ilosc: 200, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 10, jednostka: "g" },
+            { skladnik: "Orzechy włoskie", ilosc: 20, jednostka: "g" },
+        ],
+        "Kanapka ryżowa z awokado": [
+            { skladnik: "Wafle ryżowe", ilosc: 27, jednostka: "g" },
+            { skladnik: "Awokado", ilosc: 80, jednostka: "g" },
+            { skladnik: "Sok z cytryny", ilosc: 5, jednostka: "ml" },
+            { skladnik: "Sól", ilosc: 1, jednostka: "g" },
+        ],
+        "Kanapka z pastą jajeczną (mini)": [
+            { skladnik: "Jajko", ilosc: 2, jednostka: "szt" },
+            { skladnik: "Jogurt naturalny", ilosc: 30, jednostka: "g" },
+            { skladnik: "Chleb razowy", ilosc: 35, jednostka: "g" },
+            { skladnik: "Szczypiorek", ilosc: 10, jednostka: "g" },
+            { skladnik: "Sól", ilosc: 1, jednostka: "g" },
+            { skladnik: "Pieprz czarny", ilosc: 1, jednostka: "g" },
+        ],
+        "Koktajl bananowo-szpinakowy": [
+            { skladnik: "Mleko migdałowe", ilosc: 150, jednostka: "ml" },
+            { skladnik: "Banan", ilosc: 120, jednostka: "g" },
+            { skladnik: "Szpinak świeży", ilosc: 30, jednostka: "g" },
+            { skladnik: "Jogurt naturalny", ilosc: 100, jednostka: "g" },
+            { skladnik: "Masło orzechowe", ilosc: 15, jednostka: "g" },
+        ],
+        "Koktajl proteinowy z owocami leśnymi": [
+            { skladnik: "Mleko 2%", ilosc: 200, jednostka: "ml" },
+            { skladnik: "Odżywka białkowa waniliowa", ilosc: 30, jednostka: "g" },
+            { skladnik: "Owoce leśne mrożone", ilosc: 80, jednostka: "g" },
+        ],
+        "Koktajl truskawkowo-bananowy": [
+            { skladnik: "Truskawki", ilosc: 150, jednostka: "g" },
+            { skladnik: "Banan", ilosc: 100, jednostka: "g" },
+            { skladnik: "Jogurt naturalny", ilosc: 120, jednostka: "g" },
+            { skladnik: "Mleko 2%", ilosc: 150, jednostka: "ml" },
+        ],
+        "Krakersy z serkiem i rzodkiewką": [
+            { skladnik: "Krakersy", ilosc: 40, jednostka: "g" },
+            { skladnik: "Serek kremowy", ilosc: 40, jednostka: "g" },
+            { skladnik: "Rzodkiewka", ilosc: 60, jednostka: "g" },
+        ],
+        "Marchewka z hummusem i orzechami": [
+            { skladnik: "Marchewka", ilosc: 200, jednostka: "g" },
+            { skladnik: "Hummus", ilosc: 60, jednostka: "g" },
+            { skladnik: "Migdały", ilosc: 20, jednostka: "g" },
+        ],
+        "Miks orzechów z suszonymi owocami": [
+            { skladnik: "Orzechy włoskie", ilosc: 25, jednostka: "g" },
+            { skladnik: "Rodzynki", ilosc: 20, jednostka: "g" },
+            { skladnik: "Migdały", ilosc: 15, jednostka: "g" },
+        ],
+        "Mini wrap z tuńczykiem": [
+            { skladnik: "Tortilla", ilosc: 50, jednostka: "g" },
+            { skladnik: "Tuńczyk w sosie własnym", ilosc: 80, jednostka: "g" },
+            { skladnik: "Jogurt naturalny", ilosc: 30, jednostka: "g" },
+            { skladnik: "Sałata", ilosc: 30, jednostka: "g" },
+        ],
+        "Nocna owsianka z orzechami włoskimi": [
+            { skladnik: "Płatki owsiane", ilosc: 35, jednostka: "g" },
+            { skladnik: "Mleko 2%", ilosc: 100, jednostka: "ml" },
+            { skladnik: "Jogurt naturalny", ilosc: 60, jednostka: "g" },
+            { skladnik: "Orzechy włoskie", ilosc: 15, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 5, jednostka: "g" },
+        ],
+        "Owsianka overnight z jagodami": [
+            { skladnik: "Płatki owsiane", ilosc: 40, jednostka: "g" },
+            { skladnik: "Mleko 2%", ilosc: 120, jednostka: "ml" },
+            { skladnik: "Jogurt naturalny", ilosc: 80, jednostka: "g" },
+            { skladnik: "Borówki", ilosc: 60, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 8, jednostka: "g" },
+        ],
+        "Placuszek ryżowy z awokado i jajkiem": [
+            { skladnik: "Wafle ryżowe", ilosc: 27, jednostka: "g" },
+            { skladnik: "Awokado", ilosc: 60, jednostka: "g" },
+            { skladnik: "Jajko", ilosc: 1, jednostka: "szt" },
+            { skladnik: "Sól", ilosc: 1, jednostka: "g" },
+            { skladnik: "Pieprz czarny", ilosc: 1, jednostka: "g" },
+        ],
+        "Pudding ryżowy z cynamonem": [
+            { skladnik: "Ryż biały", ilosc: 40, jednostka: "g" },
+            { skladnik: "Mleko 2%", ilosc: 150, jednostka: "ml" },
+            { skladnik: "Rodzynki", ilosc: 10, jednostka: "g" },
+            { skladnik: "Cynamon mielony", ilosc: 2, jednostka: "g" },
+        ],
+        "Sałatka owocowa z jogurtem": [
+            { skladnik: "Truskawki", ilosc: 100, jednostka: "g" },
+            { skladnik: "Maliny", ilosc: 80, jednostka: "g" },
+            { skladnik: "Borówki", ilosc: 80, jednostka: "g" },
+            { skladnik: "Jogurt grecki 2%", ilosc: 150, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 8, jednostka: "g" },
+        ],
+        "Serek wiejski z ogórkiem i koprem": [
+            { skladnik: "Serek wiejski bez laktozy", ilosc: 200, jednostka: "g" },
+            { skladnik: "Ogórek świeży", ilosc: 100, jednostka: "g" },
+            { skladnik: "Pieczywo chrupkie", ilosc: 18, jednostka: "g" },
+            { skladnik: "Koper", ilosc: 5, jednostka: "g" },
+        ],
+        "Smoothie bowl z borówkami": [
+            { skladnik: "Borówki mrożone", ilosc: 100, jednostka: "g" },
+            { skladnik: "Jogurt grecki 2%", ilosc: 150, jednostka: "g" },
+            { skladnik: "Granola", ilosc: 20, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 10, jednostka: "g" },
+        ],
+        "Smoothie mango-marchewka": [
+            { skladnik: "Mango", ilosc: 120, jednostka: "g" },
+            { skladnik: "Marchewka", ilosc: 100, jednostka: "g" },
+            { skladnik: "Sok pomarańczowy", ilosc: 150, jednostka: "ml" },
+            { skladnik: "Jogurt naturalny", ilosc: 100, jednostka: "g" },
+        ],
+        "Smoothie z awokado i kakao": [
+            { skladnik: "Awokado", ilosc: 60, jednostka: "g" },
+            { skladnik: "Banan", ilosc: 100, jednostka: "g" },
+            { skladnik: "Kakao gorzkie", ilosc: 10, jednostka: "g" },
+            { skladnik: "Mleko migdałowe", ilosc: 150, jednostka: "ml" },
+        ],
+        "Tost z ricottą i pomidorem": [
+            { skladnik: "Chleb razowy", ilosc: 35, jednostka: "g" },
+            { skladnik: "Ricotta", ilosc: 80, jednostka: "g" },
+            { skladnik: "Pomidor", ilosc: 120, jednostka: "g" },
+            { skladnik: "Bazylia świeża", ilosc: 3, jednostka: "g" },
+            { skladnik: "Sól", ilosc: 1, jednostka: "g" },
+        ],
+        "Twarożek waniliowy z malinami": [
+            { skladnik: "Ser twarogowy", ilosc: 150, jednostka: "g" },
+            { skladnik: "Maliny", ilosc: 80, jednostka: "g" },
+            { skladnik: "Miód", ilosc: 10, jednostka: "g" },
+            { skladnik: "Ekstrakt waniliowy", ilosc: 2, jednostka: "ml" },
+        ],
+        "Twarożek z rzodkiewką na pieczywie chrupkim": [
+            { skladnik: "Ser twarogowy", ilosc: 100, jednostka: "g" },
+            { skladnik: "Rzodkiewka", ilosc: 75, jednostka: "g" },
+            { skladnik: "Pieczywo chrupkie", ilosc: 27, jednostka: "g" },
+            { skladnik: "Szczypiorek", ilosc: 10, jednostka: "g" },
+        ],
+        "Wrap z hummusem i warzywami": [
+            { skladnik: "Tortilla", ilosc: 50, jednostka: "g" },
+            { skladnik: "Hummus", ilosc: 50, jednostka: "g" },
+            { skladnik: "Sałata", ilosc: 50, jednostka: "g" },
+            { skladnik: "Ogórek świeży", ilosc: 60, jednostka: "g" },
+            { skladnik: "Papryka czerwona", ilosc: 40, jednostka: "g" },
+        ],
+    };
+
+    const NOWE_INSTRUKCJE = {
+        "Banan w owsiance instant": [
+            "1. Płatki wsyp do miski, zalej gorącym mlekiem lub wodą i wymieszaj.",
+            "2. Odczekaj 2–3 minuty aż płatki napęcznieją.",
+            "3. Pokrój banana w plastry, ułóż na wierzchu i podawaj.",
+        ],
+        "Budyń chia z mango": [
+            "1. Nasiona chia wymieszaj z mlekiem migdałowym i miodem.",
+            "2. Wstaw do lodówki na minimum 2 godziny (najlepiej na całą noc).",
+            "3. Mango obierz i pokrój w kosteczkę, ułóż na budyniu przed podaniem.",
+        ],
+        "Budyń proteinowy z bananem": [
+            "1. Odżywkę białkową wymieszaj z mlekiem trzepaczką do uzyskania gładkiej masy.",
+            "2. Wstaw do lodówki na 30 minut lub podawaj od razu.",
+            "3. Banana pokrój w plastry i ułóż na wierzchu.",
+        ],
+        "Hummus z marchewką i ogórkiem": [
+            "1. Marchewkę i ogórka pokrój w słupki.",
+            "2. Hummus przełóż do miseczki.",
+            "3. Podawaj warzywa z hummusem jako dip.",
+        ],
+        "Jabłko z masłem orzechowym": [
+            "1. Jabłko umyj i pokrój w ósemki lub plastry.",
+            "2. Masło orzechowe przełóż do miseczki.",
+            "3. Maczaj kawałki jabłka w maśle orzechowym.",
+        ],
+        "Jajko na twardo z pomidorem i pieczywem chrupkim": [
+            "1. Jajka gotuj w osolonej wodzie przez 8–10 minut.",
+            "2. Ostudź pod zimną wodą, obierz i pokrój na połówki.",
+            "3. Pomidora pokrój w plastry. Podawaj z pieczywem chrupkim, dopraw solą i pieprzem.",
+        ],
+        "Jogurt grecki z bananem i granolą": [
+            "1. Jogurt grecki przełóż do miski.",
+            "2. Banana pokrój w plastry i ułóż na jogurcie.",
+            "3. Posyp granolą i od razu podawaj.",
+        ],
+        "Jogurt skyr z miodem i orzechami": [
+            "1. Skyr przełóż do miski.",
+            "2. Polej miodem i posyp posiekanymi orzechami włoskimi.",
+            "3. Podawaj od razu.",
+        ],
+        "Kanapka ryżowa z awokado": [
+            "1. Awokado obierz i rozgnieć widelcem, dopraw solą i sokiem z cytryny.",
+            "2. Pastę z awokado rozsmaruj na waflach ryżowych.",
+            "3. Podawaj od razu.",
+        ],
+        "Kanapka z pastą jajeczną (mini)": [
+            "1. Jajka ugotuj na twardo (8–10 min), obierz i posiekaj.",
+            "2. Wymieszaj z jogurtem, szczypiorkiem, solą i pieprzem.",
+            "3. Rozsmaruj na kromce chleba razowego.",
+        ],
+        "Koktajl bananowo-szpinakowy": [
+            "1. Wszystkie składniki wrzuć do blendera.",
+            "2. Miksuj przez 60 sekund do uzyskania gładkiej konsystencji.",
+            "3. Przelej do szklanki i podawaj natychmiast.",
+        ],
+        "Koktajl proteinowy z owocami leśnymi": [
+            "1. Mleko, odżywkę białkową i mrożone owoce wrzuć do blendera.",
+            "2. Miksuj przez 60 sekund do uzyskania gładkiej masy.",
+            "3. Przelej do szklanki i podawaj.",
+        ],
+        "Koktajl truskawkowo-bananowy": [
+            "1. Wszystkie składniki wrzuć do blendera.",
+            "2. Miksuj przez 60 sekund do uzyskania gładkiego koktajlu.",
+            "3. Przelej do szklanki i podawaj.",
+        ],
+        "Krakersy z serkiem i rzodkiewką": [
+            "1. Rzodkiewkę pokrój w cienkie plasterki.",
+            "2. Serek kremowy rozsmaruj na krakersach.",
+            "3. Ułóż plastry rzodkiewki na wierzchu i podawaj.",
+        ],
+        "Marchewka z hummusem i orzechami": [
+            "1. Marchewkę pokrój w słupki.",
+            "2. Hummus przełóż do miseczki.",
+            "3. Dip posyp posiekanymi migdałami. Podawaj marchewkę z hummusem.",
+        ],
+        "Miks orzechów z suszonymi owocami": [
+            "1. Orzechy i rodzynki wymieszaj w miseczce.",
+            "2. Gotowe — nie wymaga żadnego gotowania.",
+        ],
+        "Mini wrap z tuńczykiem": [
+            "1. Tuńczyka odsącz z sosu i wymieszaj z jogurtem.",
+            "2. Na tortillę połóż sałatę, a na niej masę z tuńczyka.",
+            "3. Zwiń tortillę w rulon i podawaj.",
+        ],
+        "Nocna owsianka z orzechami włoskimi": [
+            "1. Płatki wymieszaj z mlekiem, jogurtem i miodem.",
+            "2. Przełóż do słoika lub miseczki, przykryj i wstaw do lodówki na noc.",
+            "3. Rano posyp pokruszonymi orzechami włoskimi.",
+        ],
+        "Owsianka overnight z jagodami": [
+            "1. Płatki wymieszaj z mlekiem, jogurtem i miodem.",
+            "2. Przełóż do słoika lub miseczki, przykryj i wstaw do lodówki na noc.",
+            "3. Rano dodaj borówki na wierzch i podawaj zimną.",
+        ],
+        "Placuszek ryżowy z awokado i jajkiem": [
+            "1. Jajko usmaż na patelni na sposób sadzony (2–3 minuty).",
+            "2. Awokado rozgnieć widelcem i rozsmaruj na waflach ryżowych.",
+            "3. Ułóż jajko sadzone na wierzchu, dopraw solą i pieprzem.",
+        ],
+        "Pudding ryżowy z cynamonem": [
+            "1. Ryż ugotuj z mlekiem na małym ogniu przez 20 minut, ciągle mieszając.",
+            "2. Dodaj rodzynki i cynamon, wymieszaj.",
+            "3. Podawaj ciepły lub ostudź i podawaj na zimno.",
+        ],
+        "Sałatka owocowa z jogurtem": [
+            "1. Owoce umyj. Truskawki pokrój na połówki.",
+            "2. Wymieszaj wszystkie owoce w misce.",
+            "3. Polej jogurtem greckim i miodem.",
+        ],
+        "Serek wiejski z ogórkiem i koprem": [
+            "1. Ogórek pokrój w drobną kostkę lub plasterki.",
+            "2. Wymieszaj serek z ogórkiem i posiekanym koperem.",
+            "3. Podawaj z pieczywem chrupkim.",
+        ],
+        "Smoothie bowl z borówkami": [
+            "1. Mrożone borówki i jogurt zblenduj na gęstą masę.",
+            "2. Przelej do miski.",
+            "3. Posyp granolą i polej miodem. Podawaj natychmiast.",
+        ],
+        "Smoothie mango-marchewka": [
+            "1. Marchewkę zetrzyj lub pokrój w plasterki.",
+            "2. Wszystkie składniki wrzuć do blendera i miksuj 60 sekund.",
+            "3. Przelej do szklanki i podawaj.",
+        ],
+        "Smoothie z awokado i kakao": [
+            "1. Awokado obierz i wyjmij pestkę.",
+            "2. Wszystkie składniki wrzuć do blendera i miksuj 60 sekund.",
+            "3. Przelej do szklanki i podawaj.",
+        ],
+        "Tost z ricottą i pomidorem": [
+            "1. Chleb razowy opiecz w tosterze.",
+            "2. Ricottę rozsmaruj grubo na gorącym toście.",
+            "3. Ułóż plastry pomidora, posyp bazylią, solą i podawaj.",
+        ],
+        "Twarożek waniliowy z malinami": [
+            "1. Twaróg wymieszaj z miodem i ekstraktem waniliowym.",
+            "2. Maliny przepłucz i osusz.",
+            "3. Wyłóż twarożek do miseczki i udekoruj malinami.",
+        ],
+        "Twarożek z rzodkiewką na pieczywie chrupkim": [
+            "1. Twaróg wymieszaj z posiekanym szczypiorkiem.",
+            "2. Rzodkiewkę pokrój w cienkie plasterki.",
+            "3. Pastę twarogową rozsmaruj na pieczywie chrupkim, ułóż rzodkiewkę.",
+        ],
+        "Wrap z hummusem i warzywami": [
+            "1. Hummus rozsmaruj równomiernie na tortilli.",
+            "2. Ułóż sałatę, ogórka pokrojonego w słupki i paprykę.",
+            "3. Zwiń tortillę w rulon i podawaj.",
+        ],
+    };
+
+    const NOWE_ODZYWIANIE = {
+        "Banan w owsiance instant":                            { kcal: 334, b: 11.6, w: 62.3, t: 6.2 },
+        "Budyń chia z mango":                                  { kcal: 220, b: 5.8,  w: 32.6, t: 9.7 },
+        "Budyń proteinowy z bananem":                          { kcal: 309, b: 31.9, w: 36.0, t: 5.8 },
+        "Hummus z marchewką i ogórkiem":                       { kcal: 210, b: 8.5,  w: 29.8, t: 8.4 },
+        "Jabłko z masłem orzechowym":                          { kcal: 222, b: 5.6,  w: 32.0, t: 10.4 },
+        "Jajko na twardo z pomidorem i pieczywem chrupkim":    { kcal: 268, b: 17.2, w: 19.2, t: 13.0 },
+        "Jogurt grecki z bananem i granolą":                   { kcal: 256, b: 17.9, w: 39.4, t: 5.0 },
+        "Jogurt skyr z miodem i orzechami":                    { kcal: 291, b: 25.0, w: 19.0, t: 14.0 },
+        "Kanapka ryżowa z awokado":                            { kcal: 230, b: 3.8,  w: 29.3, t: 12.8 },
+        "Kanapka z pastą jajeczną (mini)":                     { kcal: 273, b: 18.7, w: 18.4, t: 12.7 },
+        "Koktajl bananowo-szpinakowy":                         { kcal: 280, b: 10.7, w: 40.7, t: 11.0 },
+        "Koktajl proteinowy z owocami leśnymi":                { kcal: 260, b: 31.6, w: 22.6, t: 5.9 },
+        "Koktajl truskawkowo-bananowy":                        { kcal: 278, b: 12.1, w: 49.7, t: 5.6 },
+        "Krakersy z serkiem i rzodkiewką":                     { kcal: 285, b: 6.0,  w: 29.6, t: 15.7 },
+        "Marchewka z hummusem i orzechami":                    { kcal: 298, b: 10.8, w: 32.8, t: 16.4 },
+        "Miks orzechów z suszonymi owocami":                   { kcal: 310, b: 7.5,  w: 22.6, t: 23.9 },
+        "Mini wrap z tuńczykiem":                              { kcal: 253, b: 23.1, w: 31.7, t: 4.1 },
+        "Nocna owsianka z orzechami włoskimi":                 { kcal: 329, b: 12.6, w: 38.6, t: 15.1 },
+        "Owsianka overnight z jagodami":                       { kcal: 314, b: 12.9, w: 53.0, t: 6.6 },
+        "Placuszek ryżowy z awokado i jajkiem":               { kcal: 283, b: 10.6, w: 28.1, t: 15.3 },
+        "Pudding ryżowy z cynamonem":                          { kcal: 249, b: 8.4,  w: 47.0, t: 3.4 },
+        "Sałatka owocowa z jogurtem":                          { kcal: 234, b: 17.3, w: 41.4, t: 2.6 },
+        "Serek wiejski z ogórkiem i koprem":                   { kcal: 253, b: 24.2, w: 23.3, t: 5.7 },
+        "Smoothie bowl z borówkami":                           { kcal: 253, b: 17.3, w: 40.2, t: 4.4 },
+        "Smoothie mango-marchewka":                            { kcal: 238, b: 6.9,  w: 50.0, t: 2.4 },
+        "Smoothie z awokado i kakao":                          { kcal: 246, b: 5.0,  w: 36.4, t: 12.2 },
+        "Tost z ricottą i pomidorem":                          { kcal: 247, b: 13.1, w: 22.6, t: 11.8 },
+        "Twarożek waniliowy z malinami":                       { kcal: 232, b: 21.0, w: 20.8, t: 8.1 },
+        "Twarożek z rzodkiewką na pieczywie chrupkim":        { kcal: 212, b: 21.0, w: 22.7, t: 2.0 },
+        "Wrap z hummusem i warzywami":                         { kcal: 254, b: 8.9,  w: 39.5, t: 8.2 },
+    };
+
+    // Rozszerz globalne struktury danych
+    PRZEPISY_DATA.przepisy.push(...NOWE_NAZWY);
+    PRZEPISY_DATA.przepisy.sort((a, b) => a.localeCompare(b, 'pl'));
+    Object.assign(PRZEPISY_DATA.skladniki,  NOWE_SKLADNIKI);
+    Object.assign(PRZEPISY_DATA.instrukcje, NOWE_INSTRUKCJE);
+    Object.assign(NUTRITION_DATA,           NOWE_ODZYWIANIE);
+
+})();
+
+// Lista przepisów na II śniadanie (analogicznie do OBIADY_LIST)
+const BRUNCH_LIST = [
+    "Banan w owsiance instant",
+    "Budyń chia z mango",
+    "Budyń proteinowy z bananem",
+    "Hummus z marchewką i ogórkiem",
+    "Jabłko z masłem orzechowym",
+    "Jajko na twardo z pomidorem i pieczywem chrupkim",
+    "Jogurt grecki z bananem i granolą",
+    "Jogurt skyr z miodem i orzechami",
+    "Kanapka ryżowa z awokado",
+    "Kanapka z pastą jajeczną (mini)",
+    "Koktajl bananowo-szpinakowy",
+    "Koktajl proteinowy z owocami leśnymi",
+    "Koktajl truskawkowo-bananowy",
+    "Krakersy z serkiem i rzodkiewką",
+    "Marchewka z hummusem i orzechami",
+    "Miks orzechów z suszonymi owocami",
+    "Mini wrap z tuńczykiem",
+    "Nocna owsianka z orzechami włoskimi",
+    "Owsianka overnight z jagodami",
+    "Placuszek ryżowy z awokado i jajkiem",
+    "Pudding ryżowy z cynamonem",
+    "Sałatka owocowa z jogurtem",
+    "Serek wiejski z ogórkiem i koprem",
+    "Smoothie bowl z borówkami",
+    "Smoothie mango-marchewka",
+    "Smoothie z awokado i kakao",
+    "Tost z ricottą i pomidorem",
+    "Twarożek waniliowy z malinami",
+    "Twarożek z rzodkiewką na pieczywie chrupkim",
+    "Wrap z hummusem i warzywami",
+];

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'plan-posilkow-v7';
+const CACHE_NAME = 'plan-posilkow-v8';
 
 const PRECACHE_URLS = [
   './',
@@ -6,6 +6,8 @@ const PRECACHE_URLS = [
   './style.css',
   './manifest.json',
   './przepisy.js',
+  './przepisy-sniadania2.js',
+  './przepisy-sniadania2.js',
   './js/config.js',
   './js/sync.js',
   './js/editor.js',

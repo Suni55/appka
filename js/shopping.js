@@ -71,6 +71,21 @@
     // Debounced wrapper — odświeża listę maksymalnie raz na DEBOUNCE_DELAY ms
     const updateShoppingList = debounce(_updateShoppingList, DEBOUNCE_DELAY);
 
+    function getShopCategory(name) {
+        const n = name.toLowerCase();
+        if (/marchew|brokuł|szpinak|cukini|papryka|ogórek|pomidor|sałat|kapust|cebul|czosnek|rzodkiew|bakłażan|kukurydz|seler|por|groszek|fasola szpar|zielona/.test(n))
+            return { emoji: '🥦', label: 'Warzywa', cls: 'cat-veg' };
+        if (/jabłk|banan|gruszk|malin|borówk|truskawk|wiśni|kiwi|mango|ananas|cytry|pomarańcz|śliwk|morela|owoc/.test(n))
+            return { emoji: '🍎', label: 'Owoce', cls: 'cat-fruit' };
+        if (/mleko|jogurt|skyr|serek|twaróg|śmietan|masło|ser |ricott|mozzarell|feta|halloum/.test(n))
+            return { emoji: '🥛', label: 'Nabiał', cls: 'cat-dairy' };
+        if (/kurczak|indyk|wołowin|wieprzow|ryba|łosoś|tuńczyk|dorsz|pstrąg|krewetk|szynk|boczek|kiełbas|mięso|wędlin/.test(n))
+            return { emoji: '🥩', label: 'Mięso', cls: 'cat-meat' };
+        if (/chleb|pieczywo|bułk|makaron|ryż|kasza|płatki|mąka|bajgiel|tortilla|wafle|gnocchi|toast|tost/.test(n))
+            return { emoji: '🍞', label: 'Zboża', cls: 'cat-grain' };
+        return { emoji: '🛒', label: 'Inne', cls: 'cat-other' };
+    }
+
     function _updateShoppingList() {
         const el = document.getElementById('shopping-list');
         if (!el) return;
@@ -127,12 +142,13 @@
                     ? `${conv.amount} ${conv.unit} ${conv.original}`
                     : `${conv.amount} ${conv.unit}`;
                 const toBuyDisplay = `${Math.round(toBuy * 10) / 10} ${item.unit}`;
+                const cat = getShopCategory(item.name);
 
                 html += `<div class="shopping-item ${item.isChecked ? 'checked' : ''}">
                     <div class="checkbox ${item.isChecked ? 'checked' : ''}" onclick="toggleItem('${key}')"></div>
                     <div class="item-info">
                         <div class="item-name">${sanitize(item.name)}</div>
-                        <div class="item-details">Potrzebne: ${sanitize(neededDisplay)}</div>
+                        <div class="item-details"><span class="shop-badge ${cat.cls}">${cat.emoji} ${cat.label}</span> · Potrzebne: ${sanitize(neededDisplay)}</div>
                     </div>
                     <input type="number" class="item-input" value="${owned || ''}" placeholder="0"
                         onchange="updateOwned('${key}',this.value)" onclick="event.stopPropagation()">
