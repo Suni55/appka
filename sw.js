@@ -6,8 +6,6 @@ const PRECACHE_URLS = [
   './style.css',
   './manifest.json',
   './przepisy.js',
-  './przepisy-sniadania2.js',
-  './przepisy-sniadania2.js',
   './js/config.js',
   './js/sync.js',
   './js/editor.js',
