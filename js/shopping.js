@@ -73,15 +73,15 @@
 
     function getShopCategory(name) {
         const n = name.toLowerCase();
-        if (/marchew|brokuł|szpinak|cukini|papryka|ogórek|pomidor|sałat|kapust|cebul|czosnek|rzodkiew|bakłażan|kukurydz|seler|por|groszek|fasola szpar|zielona/.test(n))
+        if (/marchew|brokuł|szpinak|cukini|papryka|ogórek|pomidor|sałat|kapust|cebul|czosnek|rzodkiew|bakłażan|kukurydz|seler|por|groszek|fasola szpar/.test(n))
             return { emoji: '🥦', label: 'Warzywa', cls: 'cat-veg' };
         if (/jabłk|banan|gruszk|malin|borówk|truskawk|wiśni|kiwi|mango|ananas|cytry|pomarańcz|śliwk|morela|owoc/.test(n))
             return { emoji: '🍎', label: 'Owoce', cls: 'cat-fruit' };
-        if (/mleko|jogurt|skyr|serek|twaróg|śmietan|masło|ser |ricott|mozzarell|feta|halloum/.test(n))
+        if (/mleko|jogurt|skyr|serek|twaróg|twarożek|śmietan|masło(?! orzechowe| migdałowe| kokosowe| arachidowe| kakaowe)|ser |ricott|mozzarell|feta|halloum/.test(n))
             return { emoji: '🥛', label: 'Nabiał', cls: 'cat-dairy' };
         if (/kurczak|indyk|wołowin|wieprzow|ryba|łosoś|tuńczyk|dorsz|pstrąg|krewetk|szynk|boczek|kiełbas|mięso|wędlin/.test(n))
             return { emoji: '🥩', label: 'Mięso', cls: 'cat-meat' };
-        if (/chleb|pieczywo|bułk|makaron|ryż|kasza|płatki|mąka|bajgiel|tortilla|wafle|gnocchi|toast|tost/.test(n))
+        if (/chleb|pieczywo|bułk|makaron|ryż|kasza|płatki|mąka|bajgiel|tortilla|wafle|gnocchi|toast|tost|granola|krakersy|krakery/.test(n))
             return { emoji: '🍞', label: 'Zboża', cls: 'cat-grain' };
         return { emoji: '🛒', label: 'Inne', cls: 'cat-other' };
     }
